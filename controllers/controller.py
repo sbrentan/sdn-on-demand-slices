@@ -1,30 +1,34 @@
+import logging
 from typing import Dict, List
 
+from ryu.base import app_manager
+from ryu.topology import switches
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, ether_types, udp, tcp, icmp
 from ryu.app.wsgi import WSGIApplication
 
-from controllers.common import CommonController
-from controllers.api_controller import APIController
+from common import CommonController
+from api_controller import APIController
 from utils.topology import TopologyUtils, Connection
 from utils.slice import Slice
-
-
-# REST API Constants
-CONTROLLER_INSTANCE_NAME = 'dynamic_slicing_controller_api'
-BASE_URL = '/network'
+from utils.constants import CONTROLLER_INSTANCE_NAME
 
 class DynamicSlicingController(CommonController):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
-    _CONTEXTS = {'wsgi': WSGIApplication}
+    _CONTEXTS = {
+        'wsgi': WSGIApplication,
+        'switches': switches.Switches
+    }
 
     def __init__(self, *args, **kwargs):
+        logging.info("Initializing DynamicSlicingController")
         super(DynamicSlicingController, self).__init__(*args, **kwargs)
-        self.network = None  # Placeholder for DynamicSlicingTopology instance
-        self.wsgi = kwargs['wsgi']
-        self.wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
+        self.network = None  # Placeholder for DynamicSlicingTopology instance TODO: is this necessary?
+        
+        wsgi = kwargs['wsgi']
+        wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
 
 
         # TODO: Load the configuration of the network from get_all_switch/get_all_link (handle also topology changes)
@@ -39,7 +43,7 @@ class DynamicSlicingController(CommonController):
                 "allowed_protocols": ["tcp"],
             }),
         ]
-        print("slices:", self.slices)
+        logging.info("slices: " + str(self.slices))
 
         # generation of links
         # loops?
@@ -48,23 +52,28 @@ class DynamicSlicingController(CommonController):
     def init_network(self):
 
         # TODO: Initialize the data structures to store the slices
+        logging.info("Initializing network")
         self.network = TopologyUtils.build_network(self)
-        print("network:", self.network)
+        logging.info("network: " + str(self.network))
 
-        self.link_to_slice_dict: Dict[Connection, List[Slice]]
+        self.link_to_slice_dict: Dict[str, List[Slice]] = {}
 
         for connection in self.network.connections:
-            self.link_to_slice_dict[connection] = []
+            connection_id = Connection.get_link_id(connection.link_ref)
+            self.link_to_slice_dict[connection_id] = []
             for slice in self.slices:
                 connection_in_slice = False
                 for switch in slice.switches:
-                    if connection.src[0].dpid == switch or connection.dst[0].dpid == switch:
+
+                    # TODO: check if this is correct: shouldn't both src and dst be present in the slice?
+                    if switch in [connection.src[1].node_id, connection.dst[1].node_id]:
                         connection_in_slice = True
                         break
+                    
                 if connection_in_slice:
-                    self.link_to_slice_dict[connection].append(slice)
+                    self.link_to_slice_dict[connection_id].append(slice)
 
-        print("link_to_slice dicts:", self.link_to_slice_dict)
+        logging.info("link_to_slice dicts: " + str(self.link_to_slice_dict))
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
     def switch_features_handler(self, ev):
@@ -122,3 +131,10 @@ class DynamicSlicingController(CommonController):
 
     def save_slices_to_file(self, filename):
         pass
+
+# app_manager.require_app('ryu.app.rest_topology')
+# app_manager.require_app('ryu.app.rest_conf_switch')
+# app_manager.require_app('ryu.app.rest_qos')
+# app_manager.require_app('ryu.app.ofctl')
+# app_manager.require_app('ryu.app.rest_router')
+# app_manager.require_app('ryu.topology.switches', api_style=True)

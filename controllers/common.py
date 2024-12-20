@@ -2,6 +2,7 @@ import abc
 
 from ryu.base import app_manager
 
+
 class CommonController(abc.ABC, app_manager.RyuApp):
 
     def add_flow(self, datapath, priority, match, actions):

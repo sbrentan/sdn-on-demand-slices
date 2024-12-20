@@ -57,3 +57,7 @@ class DynamicSlicingTopology(Topo):
         net.start()
         CLI(net)
         net.stop()
+
+
+if __name__ == "__main__":
+    DynamicSlicingTopology().start()

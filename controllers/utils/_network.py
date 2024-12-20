@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 from enum import Enum
 from dataclasses import dataclass
@@ -17,13 +18,14 @@ class NodeType(Enum):
 
     @staticmethod
     def from_node_id(node_id: str) -> NodeType:
-        print("From node id: ", node_id)
-        if node_id.startswith("h"):
-            return NodeType.HOST
-        elif node_id.startswith("s"):
-            return NodeType.SWITCH
-        else:
-            raise ValueError(f"Unknown node type for node_id: {node_id}")
+        return NodeType.HOST
+        # logging.info("From node id: %s", node_id)
+        # if node_id.startswith("h"):
+        #     return NodeType.HOST
+        # elif node_id.startswith("s"):
+        #     return NodeType.SWITCH
+        # else:
+        #     raise ValueError(f"Unknown node type for node_id: {node_id}")
 
 
 @dataclass

@@ -36,3 +36,9 @@ class Slice:
         rules = ["allowed_protocols", "allowed_ports"]
         if not any([self.rules[r] for r in rules]):
             raise ValueError("No rules specified")
+    
+    def __repr__(self) -> str:
+        return f"Slice({self.name}) - Switches:{self.switches}"
+    
+    def __str__(self) -> str:
+        return self.__repr__()

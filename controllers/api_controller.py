@@ -1,23 +1,21 @@
+import logging
+import json
+
+from webob import Response
 from ryu.app.wsgi import ControllerBase, route
 
-
-CONTROLLER_INSTANCE_NAME = 'dynamic_slicing_controller_api'
-BASE_URL = '/network'
+from utils.constants import CONTROLLER_INSTANCE_NAME, NETWORK_BASE_URL
 
 class APIController(ControllerBase):
     def __init__(self, req, link, data, **config):
         super(APIController, self).__init__(req, link, data, **config)
-        self.controller_instance = data[CONTROLLER_INSTANCE_NAME]
+        logging.info("APIController initialized")
+        from controller import DynamicSlicingController # avoid circular import
+        self.controller_instance: DynamicSlicingController = data[CONTROLLER_INSTANCE_NAME]
 
-    @route('network', BASE_URL + '/init', methods=['POST'])
+    @route('network', NETWORK_BASE_URL + '/init', methods=['POST'])
     def init_network_endpoint(self, req, **kwargs):
         """REST endpoint to initialize the network."""
-        controller = self.controller_instance
-        controller.init_network()
-        return self._response("Network initialized successfully.")
-
-    def _response(self, message, status=200):
-        """Utility to create a JSON response."""
-        from webob import Response
-        import json
-        return Response(content_type='application/json', body=json.dumps({'message': message}), status=str(status))
+        logging.info("APIController: init_network_endpoint")
+        self.controller_instance.init_network()
+        return Response(text=json.dumps(self.controller_instance.link_to_slice_dict, default=str), content_type='application/json')
