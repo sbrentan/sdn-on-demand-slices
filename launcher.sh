@@ -19,7 +19,7 @@ ryu_manager_pid=$!
 
 echo "Ryu controller started with PID: $ryu_manager_pid"
 
-sleep 1
+sleep 3
 
 echo "Starting Mininet network..."
 sudo python3 network.py

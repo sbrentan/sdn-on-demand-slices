@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from enum import Enum
 from dataclasses import dataclass
 
@@ -19,7 +19,7 @@ class Slice:
     rules: dict
     switches: List[str]
     active: bool = True
-    # bandwidth: float,
+    bandwidth: Optional[float] = None
 
     def __post_init__(self):
         # Validate rules

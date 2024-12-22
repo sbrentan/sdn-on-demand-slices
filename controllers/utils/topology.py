@@ -10,6 +10,10 @@ from utils._network import Network, Node, NodeType, Connection
 
 class TopologyUtils:
 
+    switches: Dict[str, Switch]
+    links: Dict[str, Link]
+    hosts: Dict[str, Host]
+
     @staticmethod
     def get_all_switches(app: RyuApp) -> Dict[str, Switch]:
         # logging.info("Switches: %s", [vars(s) for s in get_all_switch(app)])
@@ -35,8 +39,8 @@ class TopologyUtils:
         logging.info(f"Switches: {switches}")
         links = TopologyUtils.get_all_links(app) # returns only the links between switches
         logging.info(f"Links: {links}")
-        # hosts = TopologyUtils.get_all_hosts(app)
-        # logging.info(f"Hosts: {hosts}")
+        hosts = TopologyUtils.get_all_hosts(app)
+        logging.info(f"Hosts: {hosts}")
 
         connections = []
         for idx, link in links.items():
@@ -62,5 +66,9 @@ class TopologyUtils:
             connections.append(Connection(src=(link.src, src_node), dst=(link.dst, dst_node), link_ref=link))
         
         # TODO: another for loop to iterate over hosts if necessary
+
+        TopologyUtils.switches = switches
+        TopologyUtils.links = links
+        TopologyUtils.hosts = hosts
         
         return Network(connections=connections)

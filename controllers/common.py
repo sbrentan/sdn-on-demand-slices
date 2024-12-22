@@ -1,9 +1,9 @@
 import abc
 
-from ryu.base import app_manager
+from ryu.base.app_manager import RyuApp
 
 
-class CommonController(abc.ABC, app_manager.RyuApp):
+class CommonController(abc.ABC, RyuApp):
 
     def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
