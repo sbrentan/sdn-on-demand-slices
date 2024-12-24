@@ -14,6 +14,7 @@ timestamp=$(date +"%Y%m%d_%H%M%S")
 log_file="logs/controller_$timestamp.log"
 
 echo "Starting Ryu controller..."
+# sudo ovs-vsctl set-manager ptcp:6632
 ryu-manager --observe-links --verbose controllers/controller.py > "$log_file" 2>&1 &
 ryu_manager_pid=$!
 

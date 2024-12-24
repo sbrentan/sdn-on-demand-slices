@@ -6,10 +6,21 @@ from dataclasses import dataclass
 class Protocol(Enum):
     TCP = "tcp"
     UDP = "udp"
+    ICMP = "icmp"
 
     @staticmethod
     def all():
         return [p.value for p in Protocol]
+    
+    def protocol_id(self) -> int:
+        if self == Protocol.TCP:
+            return 0x6
+        elif self == Protocol.UDP:
+            return 0x11
+        elif self == Protocol.ICMP:
+            return 0x1
+        else:
+            raise ValueError("Invalid protocol")
 
 
 @dataclass
