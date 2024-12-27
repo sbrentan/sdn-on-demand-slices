@@ -9,7 +9,7 @@ from mininet.link import TCLink
 SWITCHES = 4
 HOSTS = 4
 
-class DynamicSlicingTopology(Topo):
+class NetworkSlicingTopology(Topo):
 
     def __init__(self):
         # Initialize topology
@@ -59,5 +59,27 @@ class DynamicSlicingTopology(Topo):
         net.stop()
 
 
+topos = {"dynamicslicingtopo": (lambda: NetworkSlicingTopology())}
+
+# if __name__ == "__main__":
+#     NetworkSlicingTopology().start()
+
+topos = {"networkslicingtopo": (lambda: NetworkSlicingTopology())}
+
 if __name__ == "__main__":
-    DynamicSlicingTopology().start()
+    topo = NetworkSlicingTopology()
+    net = Mininet(
+        topo=topo,
+        switch=OVSKernelSwitch,
+        build=False,
+        autoSetMacs=True,
+        autoStaticArp=True,
+        link=TCLink,
+    )
+    controller = RemoteController("c1", ip="127.0.0.1", port=6633)
+    net.addController(controller) # type: ignore
+    net.build()
+    net.start()
+    CLI(net)
+    net.stop()
+

@@ -17,9 +17,9 @@ from api_controller import APIController
 from utils.topology import TopologyUtils, Connection, Node
 from utils.slice import Protocol
 from utils.slice import Slice
-from utils.constants import CONTROLLER_INSTANCE_NAME, CONTROLLER_IP, CONTROLLER_PORT
+from utils.constants import CONTROLLER_INSTANCE_NAME, CONTROLLER_IP, CONTROLLER_PORT, OVSDB_ADDR
 
-class DynamicSlicingController(CommonController):
+class DynamicSlicingController(app_manager.RyuApp, CommonController):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     _CONTEXTS = {
         'wsgi': WSGIApplication,
@@ -29,11 +29,9 @@ class DynamicSlicingController(CommonController):
     def __init__(self, *args, **kwargs):
         logging.info("Initializing DynamicSlicingController")
         super(DynamicSlicingController, self).__init__(*args, **kwargs)
-        self.network = None  # Placeholder for DynamicSlicingTopology instance TODO: is this necessary?
         
         wsgi = kwargs['wsgi']
         wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
-
 
         # TODO: Load the configuration of the network from get_all_switch/get_all_link (handle also topology changes)
 
@@ -49,6 +47,7 @@ class DynamicSlicingController(CommonController):
         ]
         logging.info("slices: " + str(self.slices))
 
+        self.network_initialized = False
         self.link_to_slice_dict: Dict[str, List[Slice]] = {}
         self.switch_connections: Dict[str, List[Connection]] = {}
 
@@ -116,6 +115,10 @@ class DynamicSlicingController(CommonController):
 
     def init_network(self):
 
+        if self.network_initialized:
+            return
+        self.network_initialized = True
+
         self.link_to_slice_dict = {}
         self.switch_connections = {}
 
@@ -149,20 +152,16 @@ class DynamicSlicingController(CommonController):
             src_port = connection.src[0].name
             dst_port = connection.dst[0].name
 
+            # TODO: change the delete_queue logic: unique url DELETE /qos/queue/all to delete all QoS queues
+            # TODO: change the delete_rules logic: unique url DELETE /qos/rules/all/all to delete all QoS rules
+
             connection_id = Connection.get_link_id(connection.link_ref)
             # if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 1:
                 # TODO: manage the case when a previous active slice is removed and the queues should be deleted anyway
-            status, result = self.delete_queues(src_dpid, src_port)
-            logging.info(f"self.delete_queues for connection ({connection}) src {src_dpid} {src_port}: {status} {result}")
-            status, result = self.delete_queues(dst_dpid, dst_port)
-            logging.info(f"self.delete_queues for connection ({connection}) dst {dst_dpid} {dst_port}: {status} {result}")
-
-            # # self.queues = [{"min_rate": "100000"}, {"min_rate": "200000", "max_rate": "500000"}]
-            # queues = []
-            # for slice in self.link_to_slice_dict.get(connection_id, []):
-            #     queues.append({"min_rate": str(slice.bandwidth), "max_rate": str(slice.bandwidth)})
-            # status, result = create_queues(src_dpid, src_port, queues, 1000000)
-            # logging.info(f"create_queues for connection ({connection}) src {src_dpid} {src_port}: {status} {result}")
+            # status, result = self.delete_queues(src_dpid, src_port)
+            # logging.info(f"self.delete_queues for connection ({connection}) src {src_dpid} {src_port}: {status} {result}")
+            # status, result = self.delete_queues(dst_dpid, dst_port)
+            # logging.info(f"self.delete_queues for connection ({connection}) dst {dst_dpid} {dst_port}: {status} {result}")
 
         for _, switch in TopologyUtils.switches.items():
             node_id = Node.get_node_id(switch)
@@ -170,12 +169,20 @@ class DynamicSlicingController(CommonController):
             for conn in switch_conn:
                 port_name = conn.src[0].name if conn.src[0].dpid == switch.dp.id else conn.dst[0].name
                 connection_id = Connection.get_link_id(conn.link_ref)
-                if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 1:
-                    queues = []
-                    for slice in self.link_to_slice_dict[connection_id]:
-                        queues.append({"min_rate": str(slice.bandwidth), "max_rate": str(slice.bandwidth)})
-                    status, result = self.create_queues(switch.dp.id, port_name, queues)
-                    logging.info(f"create_queues for switch {switch.dp.id} port {port_name}: {status} {result}")
+                # if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 1:
+
+                # TODO: check default rate limits
+                default_queue = {"min_rate": "100000000000", "max_rate": "100000000000"}
+                queues = [default_queue]
+                if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 0:
+                    for queue_id, slice in enumerate(self.link_to_slice_dict[connection_id]):
+                        temp = {"min_rate": str(slice.bandwidth), "max_rate": str(slice.bandwidth)}
+                        queues.append(temp)
+
+                logging.info(f"Creating queues for switch {switch.dp.id} port {port_name}: {queues}")
+                status, result = self.create_queues(switch.dp.id, port_name, queues)
+                # status, result = False, "Not implemented"
+                logging.info(f"create_queues for switch {switch.dp.id} port {port_name}: {status} {result}")
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
     def switch_features_handler(self, ev):
@@ -183,21 +190,27 @@ class DynamicSlicingController(CommonController):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # install the table-miss flow entry.
+        logging.info("Switch connected: %s", datapath.id)
+
+        # Install the table-miss flow entry
         match = parser.OFPMatch()
         actions = [
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
         ]
-        self.add_flow(datapath, 0, match, actions)
+        self.add_flow(datapath, 0, match, actions)  # Priority 0 for table-miss
 
-        # TODO: install the queues
+        # Install other flow entries (e.g., forwarding or QoS-related flows)
+        # match = parser.OFPMatch()  # Match IPv4 traffic
+        # actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL)]
+        # self.add_flow(datapath, 0, match, actions)  # Priority 1 for general forwarding
+
+        # set the ovsdb address
         
         dpid = dpid_lib.dpid_to_str(datapath.id)
-        ovsdb_addr = f"tcp:{CONTROLLER_IP}:6632"
         httpx.request(
             "PUT",
             f'http://{CONTROLLER_IP}:{CONTROLLER_PORT}/v1.0/conf/switches/{dpid}/ovsdb_addr', 
-            data=f'"{ovsdb_addr}"'  # type: ignore
+            data=f'"{OVSDB_ADDR}"'  # type: ignore
         )
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER) # type: ignore
@@ -209,13 +222,44 @@ class DynamicSlicingController(CommonController):
         eth = pkt.get_protocol(ethernet.ethernet)
 
         if eth.ethertype == ether_types.ETH_TYPE_LLDP: # type: ignore
+            # logging.info("LLDP packet ignored in dpid: %s", datapath.id)
             return
 
         src = eth.src  # type: ignore
         dst = eth.dst  # type: ignore
         dpid = datapath.id
 
-        self.logger.info("Packet in dpid: %s src: %s dst: %s in_port: %s", dpid, src, dst, in_port)        
+        # self.init_network()
+
+        logging.info("Packet in dpid: %s src: %s dst: %s in_port: %s", dpid, src, dst, in_port)
+        logging.info(eth)
+
+        if not self.network_initialized:
+            logging.info("Network not initialized")
+            return
+        # return
+        # out_port = slice_to_port[dpid][in_port]
+        # slice_to_port = {
+        #     1: {1: 3, 3: 1, 2: 4, 4: 2},
+        #     4: {1: 3, 3: 1, 2: 4, 4: 2},
+        #     2: {1: 2, 2: 1},
+        #     3: {1: 2, 2: 1},
+        # }
+        # switch_slices = slice_to_port.get(dpid, {})
+        # out_port = switch_slices.get(in_port, None)
+        # if out_port is None:
+        #     logging.info(f"Out port not found for {dpid} {in_port}")
+        #     return
+
+        # logging.info(f"Out port: {out_port}")
+        # actions = [
+        #     datapath.ofproto_parser.OFPActionSetQueue(0),
+        #     datapath.ofproto_parser.OFPActionOutput(out_port)
+        # ]
+        # match = datapath.ofproto_parser.OFPMatch(in_port=in_port)
+        # self.add_flow(datapath, 1, match, actions)
+        # self._send_package(msg, datapath, out_port, actions)
+        # return
         
         switch_id = f"s{dpid}"
         if switch_id not in self.switch_connections:
@@ -228,6 +272,14 @@ class DynamicSlicingController(CommonController):
         match = None
         queue_id = None
         outport = None
+        ip4_header = pkt.get_protocol(ipv4.ipv4)
+        logging.info(f"Packet: {pkt}")
+        if ip4_header is not None:
+            ip_protocol = pkt.get_protocol(ipv4.ipv4).proto  # type: ignore
+        else:
+            logging.info("No IP header found")
+            return
+        
         logging.info(f"Checking connections for switch {switch_id}: {connections}")
         for connection in connections:
             connection_id = Connection.get_link_id(connection.link_ref)
@@ -249,30 +301,32 @@ class DynamicSlicingController(CommonController):
                     # check protocol
                     protocol_valid = slice.rules["allowed_protocols"] is None
                     protocol_pkt = None
-                    ip_protocol = pkt.get_protocol(ipv4.ipv4).proto  # type: ignore
                     if not protocol_valid:
                         # Determine the transport layer protocol
                         protocol_valid = True
-                        if ip_protocol == Protocol.ICMP.protocol_id and Protocol.ICMP.value in slice.rules['allowed_protocols']:  # ICMP
+                        if ip_protocol == Protocol.ICMP.protocol_id and Protocol.ICMP in slice.rules['allowed_protocols']:  # ICMP
                             self.logger.info("Packet is ICMP, assign to Queue 1")
-                        elif ip_protocol == Protocol.TCP.protocol_id and Protocol.TCP.value in slice.rules['allowed_protocols']:  # TCP
+                            protocol_pkt = pkt.get_protocol(icmp.icmp)
+                        elif ip_protocol == Protocol.TCP.protocol_id and Protocol.TCP in slice.rules['allowed_protocols']:  # TCP
                             protocol_pkt = pkt.get_protocol(tcp.tcp)
                             self.logger.info("Packet is TCP, assign to Queue 2")
-                        elif ip_protocol == Protocol.UDP.protocol_id and Protocol.UDP.value in slice.rules['allowed_protocols']:  # UDP
+                        elif ip_protocol == Protocol.UDP.protocol_id and Protocol.UDP in slice.rules['allowed_protocols']:  # UDP
                             protocol_pkt = pkt.get_protocol(udp.udp)
                             self.logger.info("Packet is UDP, assign to Queue 3")
                         else:
                             self.logger.info(f"Protocol not in slice: {ip_protocol}")
                             self.logger.info(f"Allowed protocols: {slice.rules['allowed_protocols']}")
-                            self.logger.info(f"icmp {Protocol.ICMP.protocol_id} {Protocol.ICMP.value}")
-                            self.logger.info(f"tcp {Protocol.TCP.protocol_id} {Protocol.TCP.value}")
-                            self.logger.info(f"udp {Protocol.UDP.protocol_id} {Protocol.UDP.value}")
+                            self.logger.info(f"icmp {Protocol.ICMP.protocol_id} {Protocol.ICMP}")
+                            self.logger.info(f"tcp {Protocol.TCP.protocol_id} {Protocol.TCP}")
+                            self.logger.info(f"udp {Protocol.UDP.protocol_id} {Protocol.UDP}")
                             continue
                     if not protocol_valid:
                         continue
                     logging.info(f" - Protocol valid: {protocol_valid}")
                     # check port
                     port_valid = slice.rules["allowed_ports"] is None
+                    logging.info(f"Protocol pkt: {protocol_pkt}")
+                    logging.info(f"Protocol dict {protocol_pkt.__dict__}")
                     pkt_port = protocol_pkt.dst_port  # type: ignore
                     if not port_valid and protocol_pkt is not None:
                         port_valid = pkt_port in slice.rules["allowed_ports"]
@@ -304,7 +358,22 @@ class DynamicSlicingController(CommonController):
         if match is None:
             # TODO: manage flooding to non-slice connections
             logging.info(f"No slice matched, flooding to {no_slice_connections}")
-            pass
+            # send the packet to all the connections not belonging to any slice
+            for connection in no_slice_connections:
+                outport = connection.dst[0].port_no if connection.src[0].dpid == dpid else connection.src[0].port_no
+                actions = [datapath.ofproto_parser.OFPActionOutput(outport)]
+
+                protocol_matches = {"ip_proto": ip_protocol}
+                if ip_protocol == Protocol.UDP.protocol_id:
+                    protocol_matches["udp_dst"] = pkt.get_protocol(udp.udp).dst_port  # type: ignore
+                    protocol_matches["udp_src"] = pkt.get_protocol(udp.udp).src_port  # type: ignore
+                elif ip_protocol == Protocol.TCP.protocol_id:
+                    protocol_matches["tcp_dst"] = pkt.get_protocol(tcp.tcp).dst_port  # type: ignore
+                    protocol_matches["tcp_src"] = pkt.get_protocol(tcp.tcp).src_port  # type: ignore
+                match = datapath.ofproto_parser.OFPMatch(in_port=in_port, **protocol_matches)
+                self.add_flow(datapath, 1, match, actions)
+                self._send_package(msg, datapath, in_port, actions)
+
         else:
             logging.info(f"Matched slice, setting flow and sending packet to {outport} with queue {queue_id}")
             actions = [datapath.ofproto_parser.OFPActionSetQueue(queue_id), datapath.ofproto_parser.OFPActionOutput(outport)]
@@ -331,6 +400,7 @@ class DynamicSlicingController(CommonController):
         pass
 
 app_manager.require_app('ryu.app.rest_qos') # Needed for managing queues
+app_manager.require_app('ryu.app.rest_conf_switch') # Needed for updating ovdb address
+
 # app_manager.require_app('ryu.app.rest_topology')
 # app_manager.require_app('ryu.app.ofctl_rest')
-app_manager.require_app('ryu.app.rest_conf_switch') # Needed for updating ovdb address

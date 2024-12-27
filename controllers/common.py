@@ -3,24 +3,27 @@ import abc
 from ryu.base.app_manager import RyuApp
 
 
-class CommonController(abc.ABC, RyuApp):
+class CommonController(abc.ABC):
 
     def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+
+        # Set table_id to 1 for the QoS 
+
         mod = parser.OFPFlowMod(
-            datapath=datapath, priority=priority, match=match, instructions=inst
+            datapath=datapath, table_id=1, priority=priority, match=match, instructions=inst
         )
         datapath.send_msg(mod)
 
-    def remove_flow(self, datapath, match):
+    def delete_flow(self, datapath, match):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         
         mod = parser.OFPFlowMod(
-            datapath=datapath, command=ofproto.OFPFC_DELETE, out_port=ofproto.OFPP_ANY,
+            datapath=datapath, table_id=1, command=ofproto.OFPFC_DELETE, out_port=ofproto.OFPP_ANY,
             out_group=ofproto.OFPG_ANY, match=match
         )
         datapath.send_msg(mod)

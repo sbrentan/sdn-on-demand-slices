@@ -6,6 +6,7 @@ if [[ ":$PYTHONPATH:" != *":$module_path:"* ]]; then
     echo $PYTHONPATH
 fi
 
+# clean up logs
 rm -rf logs/*
 
 # Log file path with timestamp
@@ -15,12 +16,14 @@ log_file="logs/controller_$timestamp.log"
 
 echo "Starting Ryu controller..."
 # sudo ovs-vsctl set-manager ptcp:6632
-ryu-manager --observe-links --verbose controllers/controller.py > "$log_file" 2>&1 &
+
+RFLAGS="--observe-links"
+ryu-manager $RFLAGS controllers/controller.py > "$log_file" 2>&1 &
 ryu_manager_pid=$!
 
 echo "Ryu controller started with PID: $ryu_manager_pid"
 
-sleep 3
+sleep 5
 
 echo "Starting Mininet network..."
 sudo python3 network.py
