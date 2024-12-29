@@ -36,9 +36,13 @@ class Node:
     node_ref: Switch | Host
 
     @staticmethod
+    def get_switch_id(datapath_id: int) -> str:
+        return f"s{datapath_id}"
+
+    @staticmethod
     def get_node_id(node_ref: Switch | Host) -> str:
         if isinstance(node_ref, Switch):
-            return f"s{node_ref.dp.id}"
+            return Node.get_switch_id(node_ref.dp.id)
         # elif isinstance(node_ref, Host):
         #     return f"h{node_ref.mac}"
         raise ValueError(f"Unknown node type for node_ref: {node_ref}")
@@ -72,6 +76,12 @@ class Connection:
     @property
     def link_id(self) -> str:
         return self.get_link_id(self.link_ref)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Connection):
+            return NotImplemented
+        
+        return self.link_id == other.link_id
 
     def __repr__(self) -> str:
         return f"{self.src[1]}:{self.src[0]} -> {self.dst[1]}:{self.dst[0]}"
