@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 
+from typing import Optional
 from enum import Enum
 from dataclasses import dataclass
 
@@ -43,8 +44,8 @@ class Node:
     def get_node_id(node_ref: Switch | Host) -> str:
         if isinstance(node_ref, Switch):
             return Node.get_switch_id(node_ref.dp.id)
-        # elif isinstance(node_ref, Host):
-        #     return f"h{node_ref.mac}"
+        elif isinstance(node_ref, Host):
+            return f"{node_ref.mac}"
         raise ValueError(f"Unknown node type for node_ref: {node_ref}")
 
     def __repr__(self) -> str:
@@ -65,17 +66,30 @@ class Connection:
     
     src: tuple[Port, Node]
     dst: tuple[Port, Node]
-    link_ref: Link
+    link_ref: Optional[Link]
+
+    def __post_init__(self):
+        if self.dst[1].node_type == NodeType.HOST:
+            raise ValueError("Destination node cannot be a host")
 
     @staticmethod
-    def get_link_id(link: Link) -> str:
-        first_port_id = link.src.dpid if link.src.dpid < link.dst.dpid else link.dst.dpid
-        second_port_id = link.dst.dpid if link.src.dpid < link.dst.dpid else link.src.dpid
-        return f"s{first_port_id}-s{second_port_id}"
+    def get_link_id(connection: Connection | Link) -> str:
+        if isinstance(connection, Connection):
+            node_ids = [connection.dst[1].node_id, connection.src[1].node_id]
+        elif isinstance(connection, Link):
+            node_ids = [Node.get_switch_id(connection.dst.dpid), Node.get_switch_id(connection.src.dpid)]
+        else:
+            raise ValueError("Unknown connection type")
+        node_ids.sort()
+        return "-".join(node_ids)
 
     @property
     def link_id(self) -> str:
-        return self.get_link_id(self.link_ref)
+        return self.get_link_id(self)
+
+    @property
+    def is_host_connection(self) -> bool:
+        return self.src[1].node_type == NodeType.HOST
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Connection):

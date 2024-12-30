@@ -36,11 +36,11 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
         # TODO: Load the configuration of the network from get_all_switch/get_all_link (handle also topology changes)
 
         self.slices = [
-            Slice(name="slice1", switches=["s1", "s2", "s4"], bandwidth=9000000000, rules={
+            Slice(name="slice1", switches=["s1", "s2", "s4"], bandwidth=9000, rules={
                 "allowed_ports": [9999, 9998],
                 "allowed_protocols": [Protocol.UDP.value],
             }),
-            Slice(name="slice2", switches=["s1", "s2", "s4"], bandwidth=1000000000, rules={
+            Slice(name="slice2", switches=["s1", "s3", "s4"], bandwidth=1000, rules={
                 "allowed_ports": None,
                 "allowed_protocols": [Protocol.TCP.value, Protocol.ICMP.value],
             }),
@@ -51,12 +51,9 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
         self.slice_utils: SliceUtils
         self.link_to_slice_dict: Dict[str, List[Slice]] = {}
         self.switch_connections: Dict[str, List[Connection]] = {}
-        self.mac_to_port: Dict[str, Dict[str, Dict[str, Tuple[int, int]]]] = {}
-        # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
 
-        # generation of links
-        # loops?
-        # generation of flows
+        # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
+        self.mac_to_port: Dict[str, Dict[str, Dict[str, Tuple[int, int]]]] = {}
 
     def create_queues(self, dpid, port_name, queues) -> Tuple:
         dpid_str = dpid_lib.dpid_to_str(dpid)
@@ -69,7 +66,6 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
             "queues": queues
         }
         
-        # str(a)[2:-1]
         logging.info(f"URL: {url}, Data: {data}")
 
         try:
@@ -132,7 +128,7 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
 
         for slice in self.slices:
             for connection in self.network.connections:
-                connection_id = Connection.get_link_id(connection.link_ref)
+                connection_id = Connection.get_link_id(connection)
                 if connection_id not in self.link_to_slice_dict:
                     self.link_to_slice_dict[connection_id] = []
                 if connection.src[1].node_id in slice.switches and connection.dst[1].node_id in slice.switches:
@@ -160,7 +156,7 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
             # TODO: change the delete_queue logic: unique url DELETE /qos/queue/all to delete all QoS queues
             # TODO: change the delete_rules logic: unique url DELETE /qos/rules/all/all to delete all QoS rules
 
-            connection_id = Connection.get_link_id(connection.link_ref)
+            connection_id = Connection.get_link_id(connection)
             # if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 1:
                 # TODO: manage the case when a previous active slice is removed and the queues should be deleted anyway
             # status, result = self.delete_queues(src_dpid, src_port)
@@ -173,8 +169,7 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
             switch_conn = self.switch_connections.get(node_id, [])
             for conn in switch_conn:
                 port_name = conn.src[0].name if conn.src[0].dpid == switch.dp.id else conn.dst[0].name
-                connection_id = Connection.get_link_id(conn.link_ref)
-                # if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 1:
+                connection_id = Connection.get_link_id(conn)            # if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 1:
 
                 # TODO: check default rate limits
                 default_queue = {"min_rate": "100000000000", "max_rate": "100000000000"}
@@ -202,7 +197,7 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
         actions = [
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
         ]
-        self.add_flow(datapath, FlowPriority.TABLE_MISS, match, actions)  # Priority 0 for table-miss
+        self.add_flow(datapath, FlowPriority.TABLE_MISS.value, match, actions)  # Priority 0 for table-miss
 
         # Install other flow entries (e.g., forwarding or QoS-related flows)
         # match = parser.OFPMatch()  # Match IPv4 traffic
@@ -233,13 +228,28 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
         dst = eth.dst  # type: ignore
         dpid = datapath.id
 
+
+        # TODO:
+        # 1. Check if slice.active is correctly implemented
+        # 2. Implement slicing for also host connections
+
+
+
         logging.info("Packet in dpid: %s src: %s dst: %s in_port: %s", dpid, src, dst, in_port)
 
         switch_id = Node.get_switch_id(dpid)
-        slices = self.slice_utils.get_slices_from_packet(switch_id, pkt)
+
+        in_connection = self.slice_utils.get_in_connection(switch_id, in_port)
+        if not in_connection:
+            logging.info("[ERROR] Could not find in_connection for switch %s port %s", switch_id, in_port)
+            return
+        logging.info(f"Incoming connection: {in_connection}")
 
         # for each slice, set the mac to port for the incoming port
-        slices_to_save = slices if slices else [None]
+        slices = self.slice_utils.get_slices_from_packet(switch_id, pkt, in_connection)
+        slices_to_save = slices if not in_connection.is_host_connection else slices + [None]  # this is done so that end switches map also __no_slice mac to ports
+        slices_to_save = slices_to_save if slices_to_save else [None]
+
         for slice_idx, slice in enumerate(slices_to_save):
             slice_id = Slice.get_slice_id(slice)
             queue_id = slice_idx + 1 if slice else 0
@@ -259,7 +269,7 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
                 ]
                 match_conditions = self._get_match_conditions_for_slice(slice, pkt, in_port)
                 match = datapath.ofproto_parser.OFPMatch(**match_conditions)
-                self.add_flow(datapath, FlowPriority.DEFAULT, match, actions)
+                self.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
                 self._send_package(msg, datapath, in_port, actions)
                 logging.info(f"Packet sent to slice {slice.name} from port {in_port} to port {out_port} to queue {queue_id}")
                 return
@@ -269,26 +279,38 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
             logging.info(f"Packet belongs to slices: {slices}")
         else:
             logging.info("Packet does not belong to any slice")
-
-        in_connection = self.slice_utils.get_in_connection(switch_id, in_port)
-        if not in_connection:
-            logging.info("[ERROR] Could not find in_connection for switch %s port %s", switch_id, in_port)
-            return
         
-        outgoing_connections = self.slice_utils.get_links_for_slices(switch_id, slices, in_connection)
+        outgoing_connections = self.slice_utils.get_links_for_slices(switch_id, slices, in_connection, pkt)
+        logging.info(f"Outgoing connections: {outgoing_connections}")
+
+        # TODO: add flow when host is directly connected?
 
         if outgoing_connections:
             actions = []
             for link_id, (connection, slice, queue_id) in outgoing_connections.items():
+
+                # determine output port for the connection 
                 out_port = connection.src[0].port_no if connection.src[0].dpid == dpid else connection.dst[0].port_no
+                
+                # set the queue for the output port, and forward the packet
                 actions.append(datapath.ofproto_parser.OFPActionSetQueue(queue_id))
                 actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
-                # TODO: solve multiple match problem
-                match_conditions = self._get_match_conditions_for_slice(slice, pkt, in_port)
-                match = datapath.ofproto_parser.OFPMatch(**match_conditions)
-                logging.info(f"Packet sent from port {in_port} to port {out_port} to queue {queue_id} in FLOODING mode")
-            # self.add_flow(datapath, FlowPriority.FLOODING, match, actions)
-            # self._send_package(msg, datapath, in_port, actions)
+               
+                slice_name = slice.name if slice else "-"
+                logging.info(f"Packet sent on {link_id} from port {in_port} to port {out_port} ({slice_name}) to queue {queue_id} in FLOODING mode")
+                
+                # set the match for the slice 
+                # match_conditions = self._get_match_conditions_for_slice(slice, pkt, in_port)
+                # match = datapath.ofproto_parser.OFPMatch(**match_conditions)
+                
+                # add the flow to the switch
+                # self.add_flow(datapath, FlowPriority.FLOODING, match, slice_actions)
+            
+            # flood the packet to all specified connections (after adding flows) 
+            self._send_package(msg, datapath, in_port, actions)
+        else:
+            logging.info("No outgoing connections found for the packet, DROPPING it")
+            # TODO: send flow to DROP it?
 
     def _get_port_for_mac_and_slice(self, switch_id: str, slice_name: str, mac: str) -> Optional[Tuple[int, int]]:
         switch_slices = self.mac_to_port.get(switch_id, None)

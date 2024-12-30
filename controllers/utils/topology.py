@@ -18,7 +18,7 @@ class TopologyUtils:
     def get_all_switches(app: RyuApp) -> Dict[str, Switch]:
         # logging.info("Switches: %s", [vars(s) for s in get_all_switch(app)])
         # Map Datapath ID to Switch object 
-        return { "s" + str(s.dp.id): s for s in get_all_switch(app)}
+        return { Node.get_switch_id(s.dp.id): s for s in get_all_switch(app)}
         
     @staticmethod
     def get_all_links(app: RyuApp) -> Dict[str, Link]:
@@ -28,7 +28,7 @@ class TopologyUtils:
     @staticmethod
     def get_all_hosts(app: RyuApp) -> Dict[str, Host]:
         # logging.info("Hosts: %s", [vars(s) for s in get_all_host(app)])
-        return {h.port.dpid: h for h in get_all_host(app)} # probably wrong
+        return {h.mac: h for h in get_all_host(app)}
 
     @staticmethod
     def build_network(app: RyuApp) -> Network:
@@ -49,8 +49,8 @@ class TopologyUtils:
             logging.info("SRC: %s", vars(link.src))
             logging.info("DST: %s", vars(link.dst))
 
-            src_node_id = "s" + str(link.src.dpid)
-            dst_node_id = "s" + str(link.dst.dpid)
+            src_node_id = Node.get_switch_id(link.src.dpid)
+            dst_node_id = Node.get_switch_id(link.dst.dpid)
     
             src_node = Node(
                 node_type=NodeType.SWITCH,
@@ -66,6 +66,23 @@ class TopologyUtils:
             connections.append(Connection(src=(link.src, src_node), dst=(link.dst, dst_node), link_ref=link))
         
         # TODO: another for loop to iterate over hosts if necessary
+        
+        for idx, (mac, host) in enumerate(hosts.items()):
+            logging.info("Host %s", idx)
+            logging.info("MAC: %s", mac)
+            logging.info("Switch: %s", host.port.dpid)
+            # host_node_id = "h" + str(host.mac)  # TODO: manager better host node id
+            host_node = Node(
+                node_type=NodeType.HOST,
+                node_id=host.mac,
+                node_ref=host
+            )
+            switch_node_id = Node.get_switch_id(host.port.dpid)
+            connections.append(Connection(
+                src=(host.port, host_node),
+                dst=(host.port, Node(node_type=NodeType.SWITCH, node_id=switch_node_id, node_ref=switches[switch_node_id])),
+                link_ref=None  # TODO: no link exists between host and switch, is it a problem?
+            ))
 
         TopologyUtils.switches = switches
         TopologyUtils.links = links
