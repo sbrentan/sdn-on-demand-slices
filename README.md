@@ -84,8 +84,8 @@ h1 (client) performs bandwitdh test on h3 (server). The controller service_slici
 * -i: interactive
 
 ```sh
-h3 iperf -s -u -p 9999 -b 10M & (start listening on h3 as server in background)
-h1 iperf -c 10.0.0.3 -u -p 9999 -b 10M -t 10 -i 1 (start sending on h1 as a client)
+h3 iperf -s -u -p 9999 -b 10M -t 30 & (start listening on h3 as server in background for around 30s)
+h1 iperf -c 10.0.0.3 -u -p 9999 -b 10M -t 10 -i 1 (start sending on h1 as a client, 10 times with interval 1s)
 ```
 
 # Documentations

@@ -83,18 +83,57 @@ class Slice:
             return False
         return port in self.rules["allowed_ports"]
         
+    def is_services_valid(self, pkt: Packet) -> bool:
+        services_valid = True
+        if self.rules["allowed_services"] is not None:
+            services_valid = False
+            ip_header = pkt.get_protocol(ipv4.ipv4)
+            if ip_header is None:
+                return False
+            src = ip_header.src #type: ignore
+            dst = ip_header.dst #type: ignore
+            pkt_protocol = Protocol.from_id(ip_header.proto)  # type: ignore
+            l4_packet = SliceUtils.get_l4_packet(pkt, pkt_protocol)
+            if l4_packet is None:
+                return False
+            src_port = l4_packet.src_port  # type: ignore
+            dst_port = l4_packet.dst_port  # type: ignore
+            if src in self.rules["allowed_services"]:
+                if src_port in self.rules["allowed_services"][src]:
+                    services_valid = True
+            if dst in self.rules["allowed_services"]:
+                if dst_port in self.rules["allowed_services"][dst]:
+                    services_valid = True
+        return services_valid
 
     def __post_init__(self):
         # Validate rules
         if "allowed_protocols" not in self.rules:
             self.rules["allowed_protocols"] = None  # If none, no rule is enforced
         else:
+            if not isinstance(self.rules["allowed_protocols"], list):
+                raise ValueError("Invalid allowed protocols")
             for idx, p in enumerate(self.rules["allowed_protocols"]):
                 if p not in Protocol.all():
                     raise ValueError(f"Invalid protocol {p}")
                 self.rules["allowed_protocols"][idx] = Protocol(p)
         if "allowed_ports" not in self.rules:
             self.rules["allowed_ports"] = None  # If none, no rule is enforced
+
+        if "allowed_services" not in self.rules:
+            self.rules["allowed_services"] = None
+        else:
+            # check structure is valid: {host ip: [port]}
+            if not isinstance(self.rules["allowed_services"], dict):
+                raise ValueError("Invalid allowed services")
+            for host_ip, ports in self.rules["allowed_services"].items():
+                if not isinstance(host_ip, str):
+                    raise ValueError("Invalid host IP")
+                if not isinstance(ports, list):
+                    raise ValueError("Invalid ports")
+                for port in ports:
+                    if not isinstance(port, int):
+                        raise ValueError("Invalid port")
         
         if self.name != Slice.get_slice_id():
             if not any([self.rules[r] for r in self.rules]):
@@ -164,14 +203,20 @@ class SliceUtils:
         """
         logging.info(f"[is_slice_valid_for_pkt] Slice: {slice}")
         if slice.is_protocol_valid(pkt_protocol):
-            logging.info(f"[is_slice_valid_for_pkt] Protocol valid")
+            logging.info("[is_slice_valid_for_pkt] Protocol valid")
         else:
             return False
 
         if slice.is_port_valid(pkt_protocol, pkt):
-            logging.info(f"[is_slice_valid_for_pkt] Port valid")
+            logging.info("[is_slice_valid_for_pkt] Port valid")
         else:
             return False
+
+        if slice.is_services_valid(pkt):
+            logging.info("[is_slice_valid_for_pkt] Services valid")
+        else:
+            return False
+                
         return True
         
     def get_slices_from_packet(self, switch_id: str, pkt: Packet, in_connection: Connection) -> List[Slice]:
@@ -249,8 +294,12 @@ class SliceUtils:
                 continue
             # If the connection is with the destinated host, just forward the packet
             # Assuming src is always the host in the connection
-            if connection.src[1].node_type == NodeType.HOST and connection.src[1].node_ref.mac == eth_header.dst:  # type: ignore
-                return {connection.link_id: (connection, None, 0)}
+            if connection.is_host_connection:
+                if connection.src[1].node_ref.mac == eth_header.dst:  # type: ignore
+                    return {connection.link_id: (connection, None, 0)}
+                else:
+                    # If the host connection does not connect to the destination host, skip it
+                    continue
             link_id = connection.link_id
             logging.info(f"[get_links_for_slices] Connection: {link_id}")
 
@@ -270,7 +319,8 @@ class SliceUtils:
 
         return outgoing_connections
 
-    def get_l3_packet(self, pkt: Packet) -> Optional[PacketBase]:
+    @staticmethod
+    def get_l3_packet(pkt: Packet) -> Optional[PacketBase]:
         eth_header = pkt.get_protocol(ethernet.ethernet)
         src = eth_header.src # type: ignore
         dst = eth_header.dst # type: ignore
@@ -286,6 +336,19 @@ class SliceUtils:
             return None
         
         return pkt.get_protocol(ipv4.ipv4)
+
+    @staticmethod
+    def get_l4_packet(pkt: Packet, pkt_protocol: Optional[Protocol]) -> Optional[PacketBase]:
+        if pkt_protocol is None:
+            return None
+        if pkt_protocol == Protocol.TCP:
+            return pkt.get_protocol(tcp.tcp)
+        elif pkt_protocol == Protocol.UDP:
+            return pkt.get_protocol(udp.udp)
+        elif pkt_protocol == Protocol.ICMP:
+            return pkt.get_protocol(icmp.icmp)
+        else:
+            return None
 
     def get_packet_protocol(self, pkt: Packet) -> Protocol:
         l3_packet = self.get_l3_packet(pkt)

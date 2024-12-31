@@ -37,11 +37,12 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
 
         self.slices = [
             Slice(name="slice1", switches=["s1", "s2", "s4"], bandwidth=9000, rules={
-                "allowed_ports": [9999, 9998],
+                "allowed_services": {
+                    "10.0.0.3": [9999, 9998],
+                },
                 "allowed_protocols": [Protocol.UDP.value],
             }),
             Slice(name="slice2", switches=["s1", "s3", "s4"], bandwidth=1000, rules={
-                "allowed_ports": None,
                 "allowed_protocols": [Protocol.TCP.value, Protocol.ICMP.value],
             }),
         ]
@@ -171,7 +172,7 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
                 port_name = conn.src[0].name if conn.src[0].dpid == switch.dp.id else conn.dst[0].name
                 connection_id = Connection.get_link_id(conn)            # if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 1:
 
-                # TODO: check default rate limits
+                # TODO: check default rate limits, set them as constants
                 default_queue = {"min_rate": "100000000000", "max_rate": "100000000000"}
                 queues = [default_queue]
                 if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 0:
@@ -232,6 +233,10 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
         # TODO:
         # 1. Check if slice.active is correctly implemented
         # 2. Implement slicing for also host connections
+        # X. Check packet dropping if no slice correct (maybe correct)
+        # X. Avoid host connection in outgoing connections if host different from dst
+        # 5. When returning an udp packet (assigned to a port), the match should check src_port instead of dst_port (or leave it as is and implemente allowed_services)
+        # 6. Check default queue parameters and redirecting
 
 
 
@@ -256,22 +261,50 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
             result = self._get_port_for_mac_and_slice(switch_id, slice_id, src)
             if not result:
                 self._set_port_for_mac_and_slice(switch_id, slice_id, src, in_port, queue_id)
+                # TODO: add flow to send packet to the correct port?
+                if slice:
+                    match_conditions = self._get_match_conditions_for_slice(slice, pkt, invert_src_dst=True)
+                elif not slices:
+                    match_conditions = {
+                        "eth_dst": src,
+                        "eth_type": ether_types.ETH_TYPE_IP
+                    }
+                    queue_id = 0
+                else: continue
+                match = datapath.ofproto_parser.OFPMatch(**match_conditions)
+                actions = [
+                    datapath.ofproto_parser.OFPActionSetQueue(queue_id),
+                    datapath.ofproto_parser.OFPActionOutput(in_port)
+                ]
+                self.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
+                logging.info(f"Flow added for slice {Slice.get_slice_id(slice)} to send packet to port {in_port} with queue {queue_id}")
+                # TODO: do something when the slice is None? ---
         
+        # TODO: what happens when no slices are defined? ---
         # check if the packet belongs to a slice and send it to the corresponding port
-        for slice in slices:
-            result = self._get_port_for_mac_and_slice(switch_id, slice.name, dst)
+        slices_to_check_for_dst = slices if slices else [None]
+        for slice in slices_to_check_for_dst:
+            result = self._get_port_for_mac_and_slice(switch_id, Slice.get_slice_id(slice), dst)
             if result:
                 out_port, queue_id = result
                 # send packet and add flow
+                if slice:
+                    match_conditions = self._get_match_conditions_for_slice(slice, pkt, in_port)
+                else:
+                    match_conditions = {
+                        "eth_dst": dst,
+                        "eth_type": ether_types.ETH_TYPE_IP
+                    }
+                    # queue_id = 0
                 actions = [
                     datapath.ofproto_parser.OFPActionSetQueue(queue_id),
                     datapath.ofproto_parser.OFPActionOutput(out_port)
                 ]
-                match_conditions = self._get_match_conditions_for_slice(slice, pkt, in_port)
                 match = datapath.ofproto_parser.OFPMatch(**match_conditions)
                 self.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
                 self._send_package(msg, datapath, in_port, actions)
-                logging.info(f"Packet sent to slice {slice.name} from port {in_port} to port {out_port} to queue {queue_id}")
+                logging.info(f"Packet sent to slice {Slice.get_slice_id(slice)} from port {in_port} to port {out_port} to queue {queue_id}")
+                # TODO: isn't it more correct to add a flow for each slice?
                 return
 
         logging.info("Packet not yet mapped to any slice")
@@ -299,12 +332,12 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
                 slice_name = slice.name if slice else "-"
                 logging.info(f"Packet sent on {link_id} from port {in_port} to port {out_port} ({slice_name}) to queue {queue_id} in FLOODING mode")
                 
-                # set the match for the slice 
-                # match_conditions = self._get_match_conditions_for_slice(slice, pkt, in_port)
-                # match = datapath.ofproto_parser.OFPMatch(**match_conditions)
-                
-                # add the flow to the switch
-                # self.add_flow(datapath, FlowPriority.FLOODING, match, slice_actions)
+            # set the match for the packet
+            match_conditions = self._get_match_condictions_for_packet(pkt, in_port, slices)
+            match = datapath.ofproto_parser.OFPMatch(**match_conditions)
+            
+            # add the flow to the switch
+            self.add_flow(datapath, FlowPriority.FLOODING.value, match, actions)
             
             # flood the packet to all specified connections (after adding flows) 
             self._send_package(msg, datapath, in_port, actions)
@@ -328,29 +361,85 @@ class DynamicSlicingController(app_manager.RyuApp, CommonController):
         logging.info(f"Setting port {port} for mac {mac} in slice {slice_name} for switch {switch_id}")
         self.mac_to_port[switch_id][slice_name][mac] = (port, queue_id)
     
-    def _get_match_conditions_for_slice(self, slice: Slice, pkt: Packet, in_port: int) -> Dict:
+    def _get_match_conditions_for_slice(self, slice: Slice, pkt: Packet, in_port: Optional[int] = None, invert_src_dst: bool = False) -> Dict:
         
+        eth_header = pkt.get_protocol(ethernet.ethernet)
+        l3_packet = self.slice_utils.get_l3_packet(pkt)
+        pkt_protocol = Protocol.from_id(l3_packet.proto) if l3_packet else None  # type: ignore
+        l4_packet = self.slice_utils.get_l4_packet(pkt, pkt_protocol)
+        # TODO: check if l4_packet is None and handle it
+        
+        conditions = {
+            "eth_dst": eth_header.dst if not invert_src_dst else eth_header.src, # type: ignore
+            "eth_type": ether_types.ETH_TYPE_IP,
+        }
+        if in_port:
+            conditions["in_port"] = in_port
+        if slice.rules["allowed_protocols"] and pkt_protocol:
+            if pkt_protocol not in slice.rules["allowed_protocols"]:
+                logging.info(f"[ERROR] Protocol {pkt_protocol} not allowed for slice {slice.name}")
+            conditions["ip_proto"] = pkt_protocol.protocol_id
+        if slice.rules["allowed_ports"]:
+            dst_port = l4_packet.dst_port if not invert_src_dst else l4_packet.src_port  # type: ignore
+            if dst_port not in slice.rules["allowed_ports"]:
+                logging.info(f"[ERROR] Port {dst_port} not allowed for slice {slice.name}")
+            elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
+                conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
+        if slice.rules["allowed_services"]:
+            dst_ip = l3_packet.dst if not invert_src_dst else l3_packet.src  # type: ignore
+            src_ip = l3_packet.src if not invert_src_dst else l3_packet.dst  # type: ignore
+            if dst_ip not in slice.rules["allowed_services"] and src_ip not in slice.rules["allowed_services"]:
+                logging.info(f"[ERROR] IP {dst_ip} not allowed for slice {slice.name}")
+            else:
+                dst_port = l4_packet.dst_port if not invert_src_dst else l4_packet.src_port  # type: ignore
+                src_port = l4_packet.src_port if not invert_src_dst else l4_packet.dst_port  # type: ignore
+                if src_ip in slice.rules["allowed_services"]:
+                    allowed_ports = slice.rules["allowed_services"][src_ip]
+                    if src_port not in allowed_ports:
+                        logging.info(f"[ERROR] SRC Port {src_port} not allowed for slice {slice.name}")
+                    elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
+                        conditions.update({("udp_src" if pkt_protocol == Protocol.UDP else "tcp_src"): src_port})
+                        conditions.update({"eth_src": eth_header.src if not invert_src_dst else eth_header.dst})  # type: ignore
+                if dst_ip in slice.rules["allowed_services"]:
+                    allowed_ports = slice.rules["allowed_services"][dst_ip]
+                    if dst_port not in allowed_ports:
+                        logging.info(f"[ERROR] DST Port {dst_port} not allowed for slice {slice.name}")
+                    elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
+                        conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
+        logging.info(f"[_get_match_conditions_for_slice] Match conditions for slice {slice.name}: {json.dumps(conditions, indent=4)}")
+        return conditions
+
+    def _get_match_condictions_for_packet(self, pkt: Packet, in_port: int, slices: List[Slice]) -> Dict:
         eth_header = pkt.get_protocol(ethernet.ethernet)
         l3_packet = self.slice_utils.get_l3_packet(pkt)
         pkt_protocol = Protocol.from_id(l3_packet.proto) if l3_packet else None  # type: ignore
         
         conditions = {
             "in_port": in_port,
-            "eth_dst": eth_header.dst, # type: ignore
+            "eth_dst": eth_header.dst,  # type: ignore
             "eth_type": ether_types.ETH_TYPE_IP,
+            "eth_src": eth_header.src,  # type: ignore
         }
-        if slice.rules["allowed_protocols"] and pkt_protocol:
-            if pkt_protocol not in slice.rules["allowed_protocols"]:
-                logging.info(f"[ERROR] Protocol {pkt_protocol} not allowed for slice {slice.name}")
+        if pkt_protocol:
             conditions["ip_proto"] = pkt_protocol.protocol_id
-        if slice.rules["allowed_ports"]:
-            dst_port = l3_packet.dst_port  # type: ignore
-            if dst_port not in slice.rules["allowed_ports"]:
-                logging.info(f"[ERROR] Port {dst_port} not allowed for slice {slice.name}")
-            if pkt_protocol == Protocol.UDP.value:
-                conditions["udp_dst"] = dst_port
-            elif pkt_protocol == Protocol.TCP.value:
-                conditions["tcp_dst"] = dst_port
+        if l3_packet:
+            src = l3_packet.src  # type: ignore
+            dst = l3_packet.dst  # type: ignore
+            conditions["ipv4_src"] = src
+            conditions["ipv4_dst"] = dst
+            if pkt_protocol in [Protocol.UDP, Protocol.TCP]:
+                l4_packet = self.slice_utils.get_l4_packet(pkt, pkt_protocol)
+                # assuming the slices are active and are the incoming packet slices
+                logging.info(f"[_get_match_condictions_for_packet] Slices: {slices}")
+                logging.info(f"[_get_match_condictions_for_packet] {[s.rules['allowed_ports'] for s in slices]}")
+                logging.info(f"[_get_match_condictions_for_packet] {[s.rules['allowed_services'] for s in slices]}")
+                if any([s.rules['allowed_ports'] is not None for s in slices]) or any([s.rules["allowed_services"] and dst in s.rules["allowed_services"] for s in slices]):
+                    dst_port = l4_packet.dst_port  # type: ignore
+                    conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
+                if any([s.rules["allowed_services"] and src in s.rules["allowed_services"] for s in slices]):
+                    src_port = l4_packet.src_port  # type: ignore
+                    conditions.update({("udp_src" if pkt_protocol == Protocol.UDP else "tcp_src"): src_port})
+            logging.info(f"[_get_match_condictions_for_packet] Match conditions for packet: {json.dumps(conditions, indent=4)}")
         return conditions
 
 app_manager.require_app('ryu.app.rest_qos') # Needed for managing queues
