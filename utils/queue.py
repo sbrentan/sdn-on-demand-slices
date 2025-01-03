@@ -43,11 +43,15 @@ class Queue:
 
 
 class QueueUtils:
+
+    link_to_slice_dict: Dict[str, List[Slice]]
+    node_connections: Dict[str, List[Connection]]
+    network: Optional[Network]
     
-    def __init__(self, network: Network, link_to_slice_dict: dict, node_connections: dict):
-        self.link_to_slice_dict: Dict[str, List[Slice]] = link_to_slice_dict
-        self.node_connections: Dict[str, List[Connection]] = node_connections
-        self.network: Network = network
+    def __init__(self, network: Optional[Network], link_to_slice_dict: dict, node_connections: dict):
+        self.link_to_slice_dict = link_to_slice_dict
+        self.node_connections = node_connections
+        self.network = network
 
     def get_queues_for_slices(self, switch_id: str, slices: List[Slice], in_connection: Connection, pkt: Packet) -> Dict[str, Queue]:
         """
@@ -115,6 +119,8 @@ class QueueUtils:
 
     def init_queues(self):
         
+        if self.network is None:
+            return
         for connection in self.network.connections:
             src_dpid = connection.src[0].dpid
             dst_dpid = connection.dst[0].dpid

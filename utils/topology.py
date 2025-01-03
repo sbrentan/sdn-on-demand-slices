@@ -10,16 +10,16 @@ from utils._network import Network, Node, NodeType, Connection
 
 class TopologyUtils:
 
-    switches: Dict[str, Switch]
-    links: Dict[str, Link]
-    hosts: Dict[str, Host]
-    nodes: Dict[str, Node]
+    switches: Dict[str, Switch] = {}
+    links: Dict[str, Link] = {}
+    hosts: Dict[str, Host] = {}
+    nodes: Dict[str, Node] = {}
 
     @staticmethod
     def get_all_switches(app: RyuApp) -> Dict[str, Switch]:
         # logging.info("Switches: %s", [vars(s) for s in get_all_switch(app)])
         # Map Datapath ID to Switch object 
-        return { Node.get_switch_id(s.dp.id): s for s in get_all_switch(app)}
+        return {Node.get_switch_id(s.dp.id): s for s in get_all_switch(app)}
         
     @staticmethod
     def get_all_links(app: RyuApp) -> Dict[str, Link]:
@@ -29,7 +29,15 @@ class TopologyUtils:
     @staticmethod
     def get_all_hosts(app: RyuApp) -> Dict[str, Host]:
         # logging.info("Hosts: %s", [vars(s) for s in get_all_host(app)])
-        return { Node.get_host_id(h.mac): h for h in get_all_host(app)}
+        return {Node.get_host_id(h.mac): h for h in get_all_host(app)}
+
+    @staticmethod
+    def get_topology_dict():
+        return {
+            "switches": {k: v.to_dict() for k, v in TopologyUtils.switches.items()},
+            "links": {k: v.to_dict() for k, v in TopologyUtils.links.items()},
+            "hosts": {k: v.to_dict() for k, v in TopologyUtils.hosts.items()}
+        }
 
     @staticmethod
     def build_network(app: RyuApp) -> Network:

@@ -51,7 +51,7 @@ class NetworkSlicingTopology(Topo):
             link=TCLink,
         )
         controller = RemoteController("c1", ip="127.0.0.1", port=6633)
-        net.addController(controller) # type: ignore
+        net.addController(controller)  # type: ignore
         net.build()
         net.start()
         CLI(net)
@@ -60,24 +60,6 @@ class NetworkSlicingTopology(Topo):
 
 topos = {"dynamicslicingtopo": (lambda: NetworkSlicingTopology())}
 
-# if __name__ == "__main__":
-#     NetworkSlicingTopology().start()
-
-topos = {"networkslicingtopo": (lambda: NetworkSlicingTopology())}
-
 if __name__ == "__main__":
     topo = NetworkSlicingTopology()
-    net = Mininet(
-        topo=topo,
-        switch=OVSKernelSwitch,
-        build=False,
-        autoSetMacs=True,
-        autoStaticArp=True,
-        link=TCLink,
-    )
-    controller = RemoteController("c1", ip="127.0.0.1", port=6633)
-    net.addController(controller) # type: ignore
-    net.build()
-    net.start()
-    CLI(net)
-    net.stop()
+    topo.start()

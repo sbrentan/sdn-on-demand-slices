@@ -1,12 +1,13 @@
 #!/bin/bash
 
-module_path="/comnetsemu/app/prova"
+module_path="/comnetsemu/app/sdn-on-demand-slices"
 if [[ ":$PYTHONPATH:" != *":$module_path:"* ]]; then
     export PYTHONPATH="${PYTHONPATH:+"$PYTHONPATH:"}$module_path"
     echo $PYTHONPATH
 fi
 
-# clean up logs
+# clean up logs, create if doesn't exist
+mkdir -p logs
 rm -rf logs/*
 
 # Log file path with timestamp

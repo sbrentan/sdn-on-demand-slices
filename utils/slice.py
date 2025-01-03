@@ -140,6 +140,17 @@ class Slice:
         # if self.name != Slice.get_slice_id():
         if not any([self.rules[r] for r in self.rules]):
             raise ValueError("No rules specified")
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "rules": self.rules,
+            "switches": self.switches,
+            "hosts": self.hosts,
+            "active": self.active,
+            "min_rate": self.min_rate,
+            "max_rate": self.max_rate
+        }
     
     def __repr__(self) -> str:
         return f"Slice({self.name}) - Switches: {self.switches} - Hosts: {self.hosts}"
@@ -164,10 +175,13 @@ class Slice:
 
 
 class SliceUtils:
+
+    link_to_slice_dict: Dict[str, List[Slice]]
+    node_connections: Dict[str, List[Connection]]
     
     def __init__(self, link_to_slice_dict: dict, node_connections: dict):
-        self.link_to_slice_dict: Dict[str, List[Slice]] = link_to_slice_dict
-        self.node_connections: Dict[str, List[Connection]] = node_connections
+        self.link_to_slice_dict = link_to_slice_dict
+        self.node_connections = node_connections
 
     def get_in_connection(self, switch_id: str, in_port: int) -> Optional[Connection]:
         """
