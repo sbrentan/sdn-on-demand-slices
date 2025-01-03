@@ -1,6 +1,6 @@
 #!/bin/bash
 
-module_path="/comnetsemu/app/sdn-on-demand-slices"
+module_path="/comnetsemu/app/prova"
 if [[ ":$PYTHONPATH:" != *":$module_path:"* ]]; then
     export PYTHONPATH="${PYTHONPATH:+"$PYTHONPATH:"}$module_path"
     echo $PYTHONPATH
@@ -18,18 +18,18 @@ echo "Starting Ryu controller..."
 # sudo ovs-vsctl set-manager ptcp:6632
 
 RFLAGS="--observe-links"
-ryu-manager $RFLAGS controllers/controller.py > "$log_file" 2>&1 &
-ryu_manager_pid=$!
+ryu-manager $RFLAGS ryu_app.py > "$log_file" 2>&1 &
+# ryu_manager_pid=$!
 
-echo "Ryu controller started with PID: $ryu_manager_pid"
+# echo "Ryu controller started with PID: $ryu_manager_pid"
 
 sleep 5
 
 echo "Starting Mininet network..."
 sudo python3 network.py
 
-echo "Stopping Ryu controller..."
-kill -9 $ryu_manager_pid
+# echo "Stopping Ryu controller..."
+# kill -9 $ryu_manager_pid
 
 echo "Cleaning up..."
 sudo mn -c 

@@ -10,8 +10,7 @@ class APIController(ControllerBase):
     def __init__(self, req, link, data, **config):
         super(APIController, self).__init__(req, link, data, **config)
         logging.info("APIController initialized")
-        from controller import DynamicSlicingController # avoid circular import
-        self.controller_instance: DynamicSlicingController = data[CONTROLLER_INSTANCE_NAME]
+        self.controller_instance = data[CONTROLLER_INSTANCE_NAME]
 
     @route('network', NETWORK_BASE_URL + '/init', methods=['POST'])
     def init_network_endpoint(self, req, **kwargs):

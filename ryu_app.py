@@ -1,0 +1,390 @@
+import json, logging
+from typing import Dict, List, Tuple, Optional
+
+from ryu.base import app_manager
+from ryu.topology import event, switches
+from ryu.controller import ofp_event
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
+from ryu.ofproto import ofproto_v1_3
+from ryu.lib.packet.packet import Packet
+from ryu.lib.packet import packet, ethernet, ether_types
+from ryu.app.wsgi import WSGIApplication
+
+from controllers.rest import APIController
+from utils.topology import TopologyUtils, Connection, Node
+from utils.slice import Protocol, Slice, SliceUtils
+from utils.queue import Queue, QueueUtils
+from utils.constants import CONTROLLER_INSTANCE_NAME, FlowPriority
+
+logging.basicConfig(level=logging.DEBUG)
+
+class DynamicSlicingController(app_manager.RyuApp):
+    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    _CONTEXTS = {
+        'wsgi': WSGIApplication,
+        'switches': switches.Switches
+    }
+
+    def __init__(self, *args, **kwargs):
+        logging.info("Initializing DynamicSlicingController")
+        super(DynamicSlicingController, self).__init__(*args, **kwargs)
+
+        wsgi = kwargs['wsgi']
+        wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
+
+        # self.CONF.set_override('ovsdb_timeout', 3)
+        # self.CONF.set_default('ovsdb_timeout', 3)
+
+
+        # TODO: Load the configuration of the network from get_all_switch/get_all_link (handle also topology changes)
+
+        self.slices = [
+            Slice(name="slice1", switches=["s1", "s2", "s4"], hosts=["h1", "h3"], min_rate=9000000, max_rate=9000000, rules={
+                "allowed_services": {
+                    "10.0.0.3": [9999, 9998],
+                },
+                "allowed_protocols": [Protocol.UDP.value],
+            }),
+            # Slice(name="slice2", switches=["s1", "s3", "s4"], hosts=["h2", "h4"], bandwidth=1000, rules={
+            #     "allowed_protocols": [Protocol.TCP.value],
+            # }),
+            Slice(name="slice3", switches=["s1", "s3", "s4"], hosts=["h1", "h2", "h3", "h4"], min_rate=1000, max_rate=1000, rules={
+                "allowed_protocols": [Protocol.ICMP.value],
+            }),
+        ]
+        logging.info("slices: " + str(self.slices))
+
+        self.network_initialized = False
+        self.slice_utils: SliceUtils
+        self.queue_utils: QueueUtils
+        self.link_to_slice_dict: Dict[str, List[Slice]] = {}
+        self.node_connections: Dict[str, List[Connection]] = {}
+
+        # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
+        self.mac_to_port: Dict[str, Dict[str, Dict[str, Tuple[int, int]]]] = {}
+
+    def add_flow(self, datapath, priority, match, actions):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+
+        # Set table_id to 1 for the QoS 
+        mod = parser.OFPFlowMod(
+            datapath=datapath, table_id=1, priority=priority, match=match, instructions=inst
+        )
+        datapath.send_msg(mod)
+
+    def delete_flow(self, datapath, match):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        
+        mod = parser.OFPFlowMod(
+            datapath=datapath, table_id=1, command=ofproto.OFPFC_DELETE, out_port=ofproto.OFPP_ANY,
+            out_group=ofproto.OFPG_ANY, match=match
+        )
+        datapath.send_msg(mod)
+    
+    def _send_package(self, msg, datapath, in_port, actions):
+        data = None
+        ofproto = datapath.ofproto
+        if msg.buffer_id == ofproto.OFP_NO_BUFFER:
+            data = msg.data
+
+        out = datapath.ofproto_parser.OFPPacketOut(
+            datapath=datapath,
+            buffer_id=msg.buffer_id,
+            in_port=in_port,
+            actions=actions,
+            data=data,
+        )
+        datapath.send_msg(out)
+
+    def init_network(self):
+
+        if self.network_initialized:
+            return
+        self.network_initialized = True
+
+        self.link_to_slice_dict = {}
+        self.node_connections = {}
+
+        # Initialize the data structures to store the slices
+        logging.info("Initializing network")
+        self.network = TopologyUtils.build_network(self)
+        logging.info("network: " + str(self.network))
+
+        for slice in self.slices:
+            if not slice.active:
+                continue
+            for connection in self.network.connections:
+                connection_id = Connection.get_link_id(connection)
+                if connection_id not in self.link_to_slice_dict:
+                    self.link_to_slice_dict[connection_id] = []
+                if connection.is_host_connection:
+                    if connection.src[1].node_id in slice.hosts:
+                        if slice.name not in [s.name for s in self.link_to_slice_dict[connection_id]]:
+                            self.link_to_slice_dict[connection_id].append(slice)
+                elif connection.src[1].node_id in slice.switches and connection.dst[1].node_id in slice.switches:
+                    if slice.name not in [s.name for s in self.link_to_slice_dict[connection_id]]:
+                        self.link_to_slice_dict[connection_id].append(slice)
+        logging.info("link_to_slice dicts: " + str(self.link_to_slice_dict))
+
+        for connection in self.network.connections:
+            if connection.src[1].node_id not in self.node_connections:
+                self.node_connections[connection.src[1].node_id] = []
+            if connection.dst[1].node_id not in self.node_connections:
+                self.node_connections[connection.dst[1].node_id] = []
+            self.node_connections[connection.src[1].node_id].append(connection)
+            self.node_connections[connection.dst[1].node_id].append(connection)
+        logging.info("node_connections: " + str(self.node_connections))
+
+        self.slice_utils = SliceUtils(self.link_to_slice_dict, self.node_connections)
+        self.queue_utils = QueueUtils(self.network, self.link_to_slice_dict, self.node_connections)
+
+    # @set_ev_cls(event.EventSwitchEnter)
+    # def switch_enter_handler(self, ev):
+    #     logging.info("Initializing network")
+    #     self.network = TopologyUtils.build_network(self)
+    #     logging.info("network: " + str(self.network))
+
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
+    def switch_features_handler(self, ev):
+        datapath = ev.msg.datapath
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        logging.info("Switch connected: %s", datapath.id)
+
+        # Install the table-miss flow entry
+        match = parser.OFPMatch()
+        actions = [
+            parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
+        ]
+        self.add_flow(datapath, FlowPriority.TABLE_MISS.value, match, actions)
+
+        # set the ovsdb address
+        # self.queue_utils.set_ovsdb_address(datapath.id)
+
+    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER) # type: ignore
+    def _packet_in_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        in_port = msg.match["in_port"]
+        pkt = packet.Packet(msg.data)
+        eth = pkt.get_protocol(ethernet.ethernet)
+
+        if eth.ethertype != ether_types.ETH_TYPE_IP: # type: ignore
+            return
+
+        src = eth.src  # type: ignore
+        dst = eth.dst  # type: ignore
+        dpid = datapath.id
+
+
+        # TODO:
+        # 1. Check if slice.active is correctly implemented
+        # 2. Implement slicing for also host connections
+        # X. Check packet dropping if no slice correct (maybe correct)
+        # X. Avoid host connection in outgoing connections if host different from dst
+        # 5. When returning an udp packet (assigned to a port), the match should check src_port instead of dst_port (or leave it as is and implemente allowed_services)
+        # 6. Check default queue parameters and redirecting
+
+        logging.info("Packet in dpid: %s src: %s dst: %s in_port: %s", dpid, src, dst, in_port)
+
+        switch_id = Node.get_switch_id(dpid)
+
+        in_connection = self.slice_utils.get_in_connection(switch_id, in_port)
+        if not in_connection:
+            logging.info("[ERROR] Could not find in_connection for switch %s port %s", switch_id, in_port)
+            return
+        logging.info(f"Incoming connection: {in_connection}")
+
+        # for each slice, set the mac to port for the incoming port
+        slices = self.slice_utils.get_slices_from_packet(switch_id, pkt, in_connection)
+        slices_to_save = slices
+        # if not slices and len(self.link_to_slice_dict[in_connection.link_id]) == 0:
+        #     slices_to_save = [None]
+
+        for slice in slices_to_save:
+            slice_id = Slice.get_slice_id(slice)
+            queue = in_connection.get_queue_for_slice(slice)
+            result = self._get_port_for_mac_and_slice(switch_id, slice_id, src)
+            if not result:
+                self._set_port_for_mac_and_slice(switch_id, slice_id, src, in_port, queue)
+                
+                match_conditions = self._get_match_conditions_for_slice(slice, pkt, invert_src_dst=True)
+                match = datapath.ofproto_parser.OFPMatch(**match_conditions)
+                actions = [
+                    datapath.ofproto_parser.OFPActionSetQueue(queue.queue_id),
+                    datapath.ofproto_parser.OFPActionOutput(in_port)
+                ]
+                self.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
+                logging.info(f"Flow added for slice {Slice.get_slice_id(slice)} to send packet to port {in_port} with queue {queue.queue_id}")
+        
+        # check if the packet belongs to a slice and send it to the corresponding port
+        # TODO: comment following code?
+        for slice in slices_to_save:
+            result = self._get_port_for_mac_and_slice(switch_id, Slice.get_slice_id(slice), dst)
+            if result:
+                out_port, queue_id = result
+                # send packet and add flow
+                match_conditions = self._get_match_conditions_for_slice(slice, pkt, in_port)
+                actions = [
+                    datapath.ofproto_parser.OFPActionSetQueue(queue_id),
+                    datapath.ofproto_parser.OFPActionOutput(out_port)
+                ]
+                match = datapath.ofproto_parser.OFPMatch(**match_conditions)
+                self.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
+                self._send_package(msg, datapath, in_port, actions)
+                logging.info(f"Packet sent to slice {Slice.get_slice_id(slice)} from port {in_port} to port {out_port} to queue {queue_id}")
+                # TODO: isn't it more correct to add a flow for each slice?
+                return
+
+        logging.info("Packet not yet mapped to any slice")
+        
+        if slices:
+            logging.info(f"Packet belongs to slices: {slices}")
+        else:
+            logging.info("Packet does not belong to any slice")
+        
+        outgoing_queues = self.queue_utils.get_queues_for_slices(switch_id, slices, in_connection, pkt)
+        logging.info(f"Outgoing queues: {outgoing_queues}")
+
+        if outgoing_queues:
+            actions = []
+            for link_id, queue in outgoing_queues.items():
+
+                # determine output port for the connection 
+                out_port = queue.determine_out_port(dpid)
+                
+                # set the queue for the output port, and forward the packet
+                actions.append(datapath.ofproto_parser.OFPActionSetQueue(queue.queue_id))
+                actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
+               
+                slice_name = Slice.get_slice_id(queue.slice)
+                logging.info(f"Packet sent on {link_id} from port {in_port} to port {out_port} ({slice_name}) to queue {queue.queue_id} in FLOODING mode")
+                
+            # set the match for the packet
+            match_conditions = self._get_match_conditions_for_packet(pkt, in_port, slices)
+            match = datapath.ofproto_parser.OFPMatch(**match_conditions)
+            
+            # add the flow to the switch
+            priority = FlowPriority.FLOODING.value
+            if len(outgoing_queues) == 1:
+                connection = list(outgoing_queues.values())[0].connection
+                if connection.is_host_connection and connection.host_mac == dst:
+                    priority = FlowPriority.DEFAULT.value
+                    logging.info("Packet reached final destination, setting priority to DEFAULT")
+            self.add_flow(datapath, priority, match, actions)
+            
+            # flood the packet to all specified connections (after adding flows) 
+            self._send_package(msg, datapath, in_port, actions)
+        else:
+            logging.info("No outgoing connections found for the packet, DROPPING it")
+            # TODO: send flow to DROP it?
+
+    def _get_port_for_mac_and_slice(self, switch_id: str, slice_name: str, mac: str) -> Optional[Tuple[int, int]]:
+        switch_slices = self.mac_to_port.get(switch_id, None)
+        if switch_slices:
+            slice_macs = switch_slices.get(slice_name, None)
+            if slice_macs:
+                return slice_macs.get(mac, None)
+        return None
+
+    def _set_port_for_mac_and_slice(self, switch_id: str, slice_name: str, mac: str, port: int, queue: Queue):
+        if switch_id not in self.mac_to_port:
+            self.mac_to_port[switch_id] = {}
+        if slice_name not in self.mac_to_port[switch_id]:
+            self.mac_to_port[switch_id][slice_name] = {}
+        logging.info(f"Setting port {port} for mac {mac} in slice {slice_name} for switch {switch_id}")
+        self.mac_to_port[switch_id][slice_name][mac] = (port, queue.queue_id)
+    
+    def _get_match_conditions_for_slice(self, slice: Optional[Slice], pkt: Packet, in_port: Optional[int] = None, invert_src_dst: bool = False) -> Dict:
+        
+        eth_header = pkt.get_protocol(ethernet.ethernet)
+        l3_packet = self.slice_utils.get_l3_packet(pkt)
+        pkt_protocol = Protocol.from_id(l3_packet.proto) if l3_packet else None  # type: ignore
+        l4_packet = self.slice_utils.get_l4_packet(pkt, pkt_protocol)
+        # TODO: check if l4_packet is None and handle it
+        
+        conditions = {
+            "eth_dst": eth_header.dst if not invert_src_dst else eth_header.src, # type: ignore
+            "eth_type": ether_types.ETH_TYPE_IP,
+        }
+        if in_port:
+            conditions["in_port"] = in_port
+        if slice:
+            if slice.rules["allowed_protocols"] and pkt_protocol:
+                if pkt_protocol not in slice.rules["allowed_protocols"]:
+                    logging.info(f"[ERROR] Protocol {pkt_protocol} not allowed for slice {slice.name}")
+                conditions["ip_proto"] = pkt_protocol.protocol_id
+        if slice and l4_packet:
+            if slice.rules["allowed_ports"]:
+                dst_port = l4_packet.dst_port if not invert_src_dst else l4_packet.src_port  # type: ignore
+                if dst_port not in slice.rules["allowed_ports"]:
+                    logging.info(f"[ERROR] Port {dst_port} not allowed for slice {slice.name}")
+                elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
+                    conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
+            if slice.rules["allowed_services"]:
+                dst_ip = l3_packet.dst if not invert_src_dst else l3_packet.src  # type: ignore
+                src_ip = l3_packet.src if not invert_src_dst else l3_packet.dst  # type: ignore
+                if dst_ip not in slice.rules["allowed_services"] and src_ip not in slice.rules["allowed_services"]:
+                    logging.info(f"[ERROR] IP {dst_ip} not allowed for slice {slice.name}")
+                else:
+                    dst_port = l4_packet.dst_port if not invert_src_dst else l4_packet.src_port  # type: ignore
+                    src_port = l4_packet.src_port if not invert_src_dst else l4_packet.dst_port  # type: ignore
+                    if src_ip in slice.rules["allowed_services"]:
+                        allowed_ports = slice.rules["allowed_services"][src_ip]
+                        if src_port not in allowed_ports:
+                            logging.info(f"[ERROR] SRC Port {src_port} not allowed for slice {slice.name}")
+                        elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
+                            conditions.update({("udp_src" if pkt_protocol == Protocol.UDP else "tcp_src"): src_port})
+                            conditions.update({"eth_src": eth_header.src if not invert_src_dst else eth_header.dst})  # type: ignore
+                    if dst_ip in slice.rules["allowed_services"]:
+                        allowed_ports = slice.rules["allowed_services"][dst_ip]
+                        if dst_port not in allowed_ports:
+                            logging.info(f"[ERROR] DST Port {dst_port} not allowed for slice {slice.name}")
+                        elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
+                            conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
+        logging.info(f"[_get_match_conditions_for_slice] Match conditions for slice {Slice.get_slice_id(slice)}: {json.dumps(conditions, indent=4)}")
+        return conditions
+
+    def _get_match_conditions_for_packet(self, pkt: Packet, in_port: int, slices: List[Slice]) -> Dict:
+        eth_header = pkt.get_protocol(ethernet.ethernet)
+        l3_packet = self.slice_utils.get_l3_packet(pkt)
+        pkt_protocol = Protocol.from_id(l3_packet.proto) if l3_packet else None  # type: ignore
+        
+        conditions = {
+            "in_port": in_port,
+            "eth_dst": eth_header.dst,  # type: ignore
+            "eth_type": ether_types.ETH_TYPE_IP,
+            "eth_src": eth_header.src,  # type: ignore
+        }
+        if pkt_protocol:
+            conditions["ip_proto"] = pkt_protocol.protocol_id
+        if l3_packet:
+            src = l3_packet.src  # type: ignore
+            dst = l3_packet.dst  # type: ignore
+            conditions["ipv4_src"] = src
+            conditions["ipv4_dst"] = dst
+            if pkt_protocol in [Protocol.UDP, Protocol.TCP]:
+                l4_packet = self.slice_utils.get_l4_packet(pkt, pkt_protocol)
+                # assuming the slices are active and are the incoming packet slices
+                logging.info(f"[_get_match_condictions_for_packet] Slices: {slices}")
+                logging.info(f"[_get_match_condictions_for_packet] {[s.rules['allowed_ports'] for s in slices]}")
+                logging.info(f"[_get_match_condictions_for_packet] {[s.rules['allowed_services'] for s in slices]}")
+                if any([s.rules['allowed_ports'] is not None for s in slices]) or any([s.rules["allowed_services"] and dst in s.rules["allowed_services"] for s in slices]):
+                    dst_port = l4_packet.dst_port  # type: ignore
+                    conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
+                if any([s.rules["allowed_services"] and src in s.rules["allowed_services"] for s in slices]):
+                    src_port = l4_packet.src_port  # type: ignore
+                    conditions.update({("udp_src" if pkt_protocol == Protocol.UDP else "tcp_src"): src_port})
+            logging.info(f"[_get_match_condictions_for_packet] Match conditions for packet: {json.dumps(conditions, indent=4)}")
+        return conditions
+
+app_manager.require_app('ryu.app.rest_qos') # Needed for managing queues
+app_manager.require_app('ryu.app.rest_conf_switch') # Needed for updating ovdb address
+
+# app_manager.require_app('ryu.app.rest_topology')
+# app_manager.require_app('ryu.app.ofctl_rest')

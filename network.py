@@ -6,8 +6,7 @@ from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.cli import CLI
 from mininet.link import TCLink
 
-SWITCHES = 4
-HOSTS = 4
+from utils.constants import SWITCHES, HOSTS
 
 class NetworkSlicingTopology(Topo):
 

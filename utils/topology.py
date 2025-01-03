@@ -13,6 +13,7 @@ class TopologyUtils:
     switches: Dict[str, Switch]
     links: Dict[str, Link]
     hosts: Dict[str, Host]
+    nodes: Dict[str, Node]
 
     @staticmethod
     def get_all_switches(app: RyuApp) -> Dict[str, Switch]:
@@ -28,7 +29,7 @@ class TopologyUtils:
     @staticmethod
     def get_all_hosts(app: RyuApp) -> Dict[str, Host]:
         # logging.info("Hosts: %s", [vars(s) for s in get_all_host(app)])
-        return {h.mac: h for h in get_all_host(app)}
+        return { Node.get_host_id(h.mac): h for h in get_all_host(app)}
 
     @staticmethod
     def build_network(app: RyuApp) -> Network:
@@ -36,11 +37,14 @@ class TopologyUtils:
         logging.info("Building network...")
         logging.info("App info: %s", app)
         switches = TopologyUtils.get_all_switches(app)
-        logging.info(f"Switches: {switches}")
         links = TopologyUtils.get_all_links(app) # returns only the links between switches
-        logging.info(f"Links: {links}")
         hosts = TopologyUtils.get_all_hosts(app)
-        logging.info(f"Hosts: {hosts}")
+        nodes = {}
+
+        switches_to_print = {k: v.to_dict() for k, v in switches.items()}
+        logging.info(f"Switches: {switches_to_print}")
+        hosts_to_print = {k: v.to_dict() for k, v in hosts.items()}
+        logging.info(f"Hosts: {hosts_to_print}")
 
         connections = []
         for idx, link in links.items():
@@ -57,35 +61,47 @@ class TopologyUtils:
                 node_id=src_node_id,
                 node_ref=switches[src_node_id]
             )
+            if src_node_id not in nodes:
+                nodes[src_node_id] = src_node
             dst_node = Node(
                 node_type=NodeType.SWITCH,
                 node_id=dst_node_id,
                 node_ref=switches[dst_node_id] 
             )
+            if dst_node_id not in nodes:
+                nodes[dst_node_id] = dst_node
             
-            connections.append(Connection(src=(link.src, src_node), dst=(link.dst, dst_node), link_ref=link))
+            connections.append(Connection(
+                src=(link.src, src_node), 
+                dst=(link.dst, dst_node), 
+                link_ref=link,
+                queues=[]
+            ))
         
-        # TODO: another for loop to iterate over hosts if necessary
-        
-        for idx, (mac, host) in enumerate(hosts.items()):
-            logging.info("Host %s", idx)
-            logging.info("MAC: %s", mac)
+        for host_id, host in hosts.items():
+            logging.info("Host %s", host_id)
             logging.info("Switch: %s", host.port.dpid)
-            # host_node_id = "h" + str(host.mac)  # TODO: manager better host node id
+            logging.info("IPv4 address: %s", host.ipv4)
             host_node = Node(
                 node_type=NodeType.HOST,
-                node_id=host.mac,
+                node_id=host_id,
                 node_ref=host
             )
+            
+            if host_id not in nodes:
+                nodes[host_id] = host_node
             switch_node_id = Node.get_switch_id(host.port.dpid)
+            
             connections.append(Connection(
                 src=(host.port, host_node),
                 dst=(host.port, Node(node_type=NodeType.SWITCH, node_id=switch_node_id, node_ref=switches[switch_node_id])),
-                link_ref=None  # TODO: no link exists between host and switch, is it a problem?
+                link_ref=None,  # no link exists between host and switch
+                queues=[]
             ))
 
         TopologyUtils.switches = switches
         TopologyUtils.links = links
         TopologyUtils.hosts = hosts
+        TopologyUtils.nodes = nodes
         
         return Network(connections=connections)

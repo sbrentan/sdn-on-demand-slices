@@ -1,7 +1,7 @@
 from __future__ import annotations
-import logging
 
-from typing import Optional
+import logging
+from typing import Optional, List, Any
 from enum import Enum
 from dataclasses import dataclass
 
@@ -39,13 +39,17 @@ class Node:
     @staticmethod
     def get_switch_id(datapath_id: int) -> str:
         return f"s{datapath_id}"
+    
+    @staticmethod
+    def get_host_id(mac: str) -> str:
+        return "h" + str(int(mac.replace(":", ""), 16))
 
     @staticmethod
     def get_node_id(node_ref: Switch | Host) -> str:
         if isinstance(node_ref, Switch):
             return Node.get_switch_id(node_ref.dp.id)
         elif isinstance(node_ref, Host):
-            return f"{node_ref.mac}"
+            return Node.get_host_id(node_ref.mac)
         raise ValueError(f"Unknown node type for node_ref: {node_ref}")
 
     def __repr__(self) -> str:
@@ -67,6 +71,7 @@ class Connection:
     src: tuple[Port, Node]
     dst: tuple[Port, Node]
     link_ref: Optional[Link]
+    queues: List[Any]
 
     def __post_init__(self):
         if self.dst[1].node_type == NodeType.HOST:
@@ -91,6 +96,18 @@ class Connection:
     def is_host_connection(self) -> bool:
         return self.src[1].node_type == NodeType.HOST
 
+    @property
+    def host_mac(self) -> str:
+        if not self.src or not self.src[1] or not isinstance(self.src[1].node_ref, Host):
+            raise ValueError("Invalid source node for host connection")
+        return self.src[1].node_ref.mac
+
+    def get_queue_for_slice(self, slice: Any) -> Any:  # Cannot define type of slice as it is a circular import
+        for queue in self.queues:
+            if queue.slice == slice:
+                return queue
+        raise ValueError(f"No queue found for slice: {slice}")
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Connection):
             return NotImplemented
@@ -107,7 +124,7 @@ class Connection:
 @dataclass
 class Network:
 
-    connections: list[Connection]
+    connections: List[Connection]
 
     def __repr__(self) -> str:
         return f"Network({self.connections})"

@@ -76,12 +76,12 @@ To run a command in background from a specific host (e.g. h3 iperf) inside minin
 
 h1 (client) performs bandwitdh test on h3 (server). The controller service_slicing.py is configured to allow the UDP port 9999 to have a max bandwidth of 10 Mbps. If the port change (e.g. if we put 9998), the max bandwidth drops to 1 Mbps. The following command specify:
 
-* -s / -c: server mode or client mode
-* -u: UDP
-* -p 9999: port 9999
-* -b: bandwidth
-* -t: number of tests
-* -i: interactive
+* -s / -c: set respectively the server or client mode
+* -u: change the protocol from TCP to UDP
+* -p 9999: set the port to 9999
+* -b 100M: set the upper bound of the bandwidth available (default = 1Mbps) 
+* -t: duration of the test (in seconds)
+* -i: report interval (in seconds)
 
 ```sh
 h3 iperf -s -u -p 9999 -b 10M -t 30 & (start listening on h3 as server in background for around 30s)

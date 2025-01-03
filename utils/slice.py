@@ -5,12 +5,11 @@ from typing import Dict, List, Tuple, Optional
 from enum import Enum
 from dataclasses import dataclass
 
-from utils.topology import Connection, NodeType
-
 from ryu.lib.packet.packet import Packet
 from ryu.lib.packet.packet_base import PacketBase
-from ryu.lib.packet import packet, ethernet, ipv4, ipv6, icmp, tcp, udp, ether_types
+from ryu.lib.packet import ethernet, ipv4, icmp, tcp, udp, ether_types
 
+from utils.topology import Connection
 
 class Protocol(Enum):
     TCP = "tcp"
@@ -46,13 +45,16 @@ class Slice:
     name: str
     rules: dict
     switches: List[str]
+    hosts: List[str]
     active: bool = True
-    bandwidth: Optional[float] = None
+    min_rate: Optional[int] = None  # In bps
+    max_rate: Optional[int] = None  # In bps
 
     @staticmethod
     def get_slice_id(slice: Optional[Slice] = None) -> str:
         if slice:
             return slice.name
+        raise ValueError("No slice provided")
         return "__no_slice"
 
     def is_protocol_valid(self, pkt_protocol: Protocol) -> bool:
@@ -135,12 +137,12 @@ class Slice:
                     if not isinstance(port, int):
                         raise ValueError("Invalid port")
         
-        if self.name != Slice.get_slice_id():
-            if not any([self.rules[r] for r in self.rules]):
-                raise ValueError("No rules specified")
+        # if self.name != Slice.get_slice_id():
+        if not any([self.rules[r] for r in self.rules]):
+            raise ValueError("No rules specified")
     
     def __repr__(self) -> str:
-        return f"Slice({self.name}) - Switches:{self.switches}"
+        return f"Slice({self.name}) - Switches: {self.switches} - Hosts: {self.hosts}"
     
     def __str__(self) -> str:
         return self.__repr__()
@@ -163,9 +165,9 @@ class Slice:
 
 class SliceUtils:
     
-    def __init__(self, link_to_slice_dict: dict, switch_connections: dict):
+    def __init__(self, link_to_slice_dict: dict, node_connections: dict):
         self.link_to_slice_dict: Dict[str, List[Slice]] = link_to_slice_dict
-        self.switch_connections: Dict[str, List[Connection]] = switch_connections
+        self.node_connections: Dict[str, List[Connection]] = node_connections
 
     def get_in_connection(self, switch_id: str, in_port: int) -> Optional[Connection]:
         """
@@ -178,7 +180,7 @@ class SliceUtils:
         Returns:
             Connection: Incoming connection of the packet
         """
-        connections = self.switch_connections.get(switch_id, [])
+        connections = self.node_connections.get(switch_id, [])
         logging.info(f"[get_in_connection] Switch connections: {connections} for switch {switch_id}")
         for connection in connections:
             src_valid = connection.src[1].node_id == switch_id and connection.src[0].port_no == in_port
@@ -239,85 +241,15 @@ class SliceUtils:
 
         result = []
         
-        if in_connection.is_host_connection:
-            # If the incoming connection is from a host, the packet is not part of any slice
-            # Detect the slices that the packet belongs to based on the incoming packet
-            # result.append(Slice(name=Slice.get_slice_id(), rules={}, switches=[]))
-            connections = self.switch_connections.get(switch_id, [])
-            for connection in connections:
-                if connection == in_connection:
-                    continue
-                connection_slices = self.link_to_slice_dict.get(connection.link_id, [])
-                for slice in connection_slices:
-                    if self.is_slice_valid_for_pkt(slice, self.get_packet_protocol(pkt), pkt) and slice not in result:
-                        logging.info(f"[get_slices_from_packet] Slice detected for incoming host packet: {slice}")
-                        result.append(slice)
-        else:
-            logging.info(f"[get_slice_from_packet] Connection: {in_connection}")
-            slices = self.link_to_slice_dict.get(in_connection.link_id, [])
-            for slice in slices:
-                if (self.is_slice_valid_for_pkt(slice, pkt_protocol, pkt)):
-                    logging.info(f"[get_slice_from_packet] Slice found: {slice}")
-                    result.append(slice)
-            if not result:
-                # Assuming that host connections are slice independent and are never assigned to a slice
-                logging.info("[ERROR] [get_slice_from_packet] No slice found")
+        slices = self.link_to_slice_dict.get(in_connection.link_id, [])
+        logging.info(f"[get_slice_from_packet] Slices: {slices}")
+        for slice in slices:
+            if (self.is_slice_valid_for_pkt(slice, pkt_protocol, pkt)):
+                logging.info(f"[get_slice_from_packet] Slice found: {slice}")
+                result.append(slice)
+        if not result:
+            logging.info("[get_slice_from_packet] No slice found")
         return result
-
-    def get_links_for_slices(self, switch_id: str, slices: List[Slice], in_connection: Connection, pkt: Packet) -> Dict[str, Tuple[Connection, Optional[Slice], int]]:
-        """
-        Get the links that are part of the slices, excluding the in_connection
-        If there are no slices, assuming the incoming packet is not part of any slice
-        Assuming that if slices are not empty, all the outgoing connections that are not part of a slice are not allowed
-
-        If the packet belongs to a slice:
-        - If some outgoing connections are found for the slice, return those
-        - For all the other cases, return empty Dict (meaning the packet should be dropped)
-        If the packet does not belong to a slice:
-        - Return all the outgoing connections which are not part of any slice
-
-        Args:
-            switch_id (str): ID of the switch where the packet came from (e.g. s1)
-            slices (Dict[Slice]): Dict of slices that the packet belongs to
-            in_connection (Connection): Incoming connection of the packet
-
-        Returns:
-            Dict[Tuple[Connection, int]]: Dict of outgoing connections and the queue id
-        """
-        connections = self.switch_connections.get(switch_id, [])
-        eth_header = pkt.get_protocol(ethernet.ethernet)
-        logging.info(f"[get_links_for_slices] Switch {switch_id} connections: {connections}")
-        outgoing_connections = {}
-
-        for connection in connections:
-            if connection == in_connection:
-                continue
-            # If the connection is with the destinated host, just forward the packet
-            # Assuming src is always the host in the connection
-            if connection.is_host_connection:
-                if connection.src[1].node_ref.mac == eth_header.dst:  # type: ignore
-                    return {connection.link_id: (connection, None, 0)}
-                else:
-                    # If the host connection does not connect to the destination host, skip it
-                    continue
-            link_id = connection.link_id
-            logging.info(f"[get_links_for_slices] Connection: {link_id}")
-
-            for slice in slices:
-                try:
-                    queue_id = self.link_to_slice_dict[link_id].index(slice) + 1
-                    logging.info(f"[get_links_for_slices] Slice found: {slice} with queue_id: {queue_id}")
-                    if link_id not in outgoing_connections:
-                        outgoing_connections[link_id] = (connection, slice, queue_id)
-                except ValueError:
-                    continue
-            if not slices:
-                # If the packet does not belong to any slice, return all the outgoing connections that are not part of a slice
-                if not self.link_to_slice_dict[link_id]:
-                    logging.info(f"[get_links_for_slices] No slice found for link: {link_id}, setting queue_id to 0")
-                    outgoing_connections[link_id] = (connection, None, 0)
-
-        return outgoing_connections
 
     @staticmethod
     def get_l3_packet(pkt: Packet) -> Optional[PacketBase]:
