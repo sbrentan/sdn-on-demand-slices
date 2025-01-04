@@ -19,12 +19,37 @@ document.addEventListener("DOMContentLoaded", () => {
         ],
     };
 
+    const slices = [
+        {
+            name: "Slice 1",
+            minRate: "10 Mbps",
+            maxRate: "100 Mbps",
+            nodes: ["h1", "s1", "s2"],
+            links: ["h1-s1", "s1-s2"]
+        },
+        {
+            name: "Slice 2",
+            minRate: "20 Mbps",
+            maxRate: "200 Mbps",
+            nodes: ["h2", "s3", "s4"],
+            links: ["h2-s3", "s3-s4", "s4-h2"]
+        }
+    ];
+
+    const sliceList = document.getElementById("slice-list");
+    slices.forEach((slice, index) => {
+        const li = document.createElement("li");
+        li.textContent = `${slice.name} (${slice.minRate} - ${slice.maxRate})`;
+        li.dataset.index = index;
+        sliceList.appendChild(li);
+    });
+
     // Retrieve saved layout from cookie
     const savedLayout = getCookie("networkLayout");
     const data = savedLayout ? JSON.parse(savedLayout) : defaultData;
 
-    const width = document.getElementById("network-graph").clientWidth;
-    const height = 600;
+    const width = 800;//document.getElementById("network-graph").clientWidth;
+    const height = 400;
 
     const svg = d3.select("#network-graph")
         .attr("viewBox", `0 0 ${width} ${height}`);
@@ -94,6 +119,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 event.subject.fx = null;
                 event.subject.fy = null;
             });
+    }
+    sliceList.addEventListener("click", event => {
+        if (event.target.tagName === "LI") {
+            const selectedSlice = slices[event.target.dataset.index];
+            highlightSlice(selectedSlice);
+        }
+    });
+
+    function highlightSlice(slice) {
+        node.attr("fill", d => slice.nodes.includes(d.id) ? "orange" : d.type === "host" ? "blue" : "green");
+        link.attr("stroke", d => slice.links.includes(`${d.source.id}-${d.target.id}`) ? "red" : "#aaa");
     }
 
     // Save layout button event

@@ -1,18 +1,52 @@
 body {
     font-family: Arial, sans-serif;
     margin: 0;
-    padding: 0;
-    background-color: #f9f9f9;
 }
-  
+
 #app {
-    text-align: center;
-    padding: 20px;
-}
-  
-#network-graph {
+    display: flex;
+    flex-direction: row;
     width: 100%;
-    height: 600px;
-    border: 1px solid #ccc;
 }
-  
+
+#controls {
+    padding: 10px;
+    background-color: #f4f4f4;
+    border-right: 1px solid #ddd;
+}
+
+#sidebar {
+    width: 300px;
+    padding: 10px;
+    background-color: #f4f4f4;
+    border-right: 1px solid #ddd;
+}
+
+#sidebar h2 {
+    margin-top: 0;
+}
+
+#slice-list {
+    list-style: none;
+    padding: 0;
+}
+
+#slice-list li {
+    border: 1px solid #ddd;
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #fff;
+    transition: background-color 0.3s;
+}
+
+#slice-list li:hover {
+    background-color: #e0f7fa;
+}
+
+#graph-container {
+    flex: 1;
+    overflow: auto;
+    padding: 10px;
+}

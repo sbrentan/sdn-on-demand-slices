@@ -18,10 +18,19 @@
 <body>
     <h1>SDN On-Demand Slices</h1>
     <div id="app">
-        <h1>Network Topology</h1>
-        <button id="save-layout">Save Layout</button>
-        <svg id="network-graph"></svg>
+        <!-- <h1>Network Topology</h1> -->
+        <div id="controls">
+            <button id="save-layout">Save Layout</button>
+        </div>
+        <div id="sidebar">
+            <h2>Slices</h2>
+            <ul id="slice-list"></ul>
+        </div>
+        <div id="graph-container">
+            <svg id="network-graph"></svg>
+        </div>
     </div>
+    
     <!-- <div class="container">
         <div class="row">
             <div class="col-md-6">
