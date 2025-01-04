@@ -11,6 +11,7 @@ from ryu.lib.packet import packet, ethernet, ether_types
 from ryu.app.wsgi import WSGIApplication
 
 from controllers.api import APIController
+from controllers.gui import GUIController
 from utils.topology import TopologyUtils, Connection, Node
 from utils.slice import Protocol, Slice, SliceUtils
 from utils.queue import Queue, QueueUtils
@@ -29,8 +30,10 @@ class DynamicSlicingController(app_manager.RyuApp):
         logging.info("Initializing DynamicSlicingController")
         super(DynamicSlicingController, self).__init__(*args, **kwargs)
 
-        wsgi = kwargs['wsgi']
-        wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
+        # Register the API and GUI controllers
+        self.wsgi = kwargs['wsgi']
+        self.wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
+        self.wsgi.register(GUIController)
 
         # self.CONF.set_override('ovsdb_timeout', 3)
         # self.CONF.set_default('ovsdb_timeout', 3)

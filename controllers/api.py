@@ -14,7 +14,7 @@ for path in Paths.__dict__:
     if not path.startswith("__"):
         # if API_BASE_URL is not present in the path, add it
         if API_BASE_URL not in Paths.__dict__[path][::len(API_BASE_URL)]:
-            Paths.__dict__[path] = API_BASE_URL + Paths.__dict__[path]
+            setattr(Paths, path, API_BASE_URL + getattr(Paths, path))
 
 class APIController(ControllerBase):
     def __init__(self, req, link, data, **config):
