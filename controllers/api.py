@@ -16,6 +16,11 @@ for path in Paths.__dict__:
         if API_BASE_URL not in Paths.__dict__[path][::len(API_BASE_URL)]:
             setattr(Paths, path, API_BASE_URL + getattr(Paths, path))
 
+logging.info(f"[APIController] Loaded paths:")
+for path in Paths.__dict__:
+    if not path.startswith("__"):
+        logging.info(f"\t- {path}: {getattr(Paths, path)}")
+
 class APIController(ControllerBase):
     def __init__(self, req, link, data, **config):
         super(APIController, self).__init__(req, link, data, **config)

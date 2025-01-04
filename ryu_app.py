@@ -2,7 +2,7 @@ import json, logging
 from typing import Dict, List, Tuple, Optional
 
 from ryu.base import app_manager
-from ryu.topology import switches
+from ryu.topology import switches, event
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
@@ -31,9 +31,9 @@ class DynamicSlicingController(app_manager.RyuApp):
         super(DynamicSlicingController, self).__init__(*args, **kwargs)
 
         # Register the API and GUI controllers
-        self.wsgi = kwargs['wsgi']
-        self.wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
-        self.wsgi.register(GUIController)
+        wsgi = kwargs['wsgi']
+        wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
+        wsgi.register(GUIController)
 
         # self.CONF.set_override('ovsdb_timeout', 3)
         # self.CONF.set_default('ovsdb_timeout', 3)
@@ -142,6 +142,17 @@ class DynamicSlicingController(app_manager.RyuApp):
         self.slice_utils.link_to_slice_dict = self.link_to_slice_dict
         self.queue_utils.link_to_slice_dict = self.link_to_slice_dict
         self.queue_utils.init_queues()
+
+    @set_ev_cls(event.EventHostAdd)
+    def host_features_handler(self, ev):
+        logging.info("Host connected: %s", Node.get_host_id(ev.host.mac))
+
+        # Initialize the data structures to store the slices
+        logging.info("Updating network...")
+        self.network = TopologyUtils.build_network(self)
+        logging.info("Updated network: " + str(self.network))
+
+        self.init_node_connections()
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
     def switch_features_handler(self, ev):

@@ -18,8 +18,7 @@ log_file="logs/controller_$timestamp.log"
 echo "Starting Ryu controller..."
 # sudo ovs-vsctl set-manager ptcp:6632
 
-RFLAGS="--observe-links"
-ryu-manager $RFLAGS ryu_app.py > "$log_file" 2>&1 &
+ryu-manager --observe-links ryu_app.py > "$log_file" 2>&1 &
 # ryu_manager_pid=$!
 
 # echo "Ryu controller started with PID: $ryu_manager_pid"
