@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const savedLayout = getCookie("networkLayout");
     const data = savedLayout ? JSON.parse(savedLayout) : defaultData;
 
-    const width = 800;//document.getElementById("network-graph").clientWidth;
+    const width = 800; //document.getElementById("network-graph").clientWidth;
     const height = 400;
 
     const svg = d3.select("#network-graph")
@@ -120,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 event.subject.fy = null;
             });
     }
+
     sliceList.addEventListener("click", event => {
         if (event.target.tagName === "LI") {
             const selectedSlice = slices[event.target.dataset.index];
@@ -140,7 +141,11 @@ document.addEventListener("DOMContentLoaded", () => {
             x: node.x,
             y: node.y
         }));
-        const layoutJSON = JSON.stringify(layout);
+        const links = data.links.map(link => ({
+            source: link.source.id,
+            target: link.target.id
+        }));
+        const layoutJSON = JSON.stringify({ nodes: layout, links });
         console.log(layoutJSON);
         setCookie("networkLayout", layoutJSON, 7); // Save for 7 days
         alert("Layout saved!");
