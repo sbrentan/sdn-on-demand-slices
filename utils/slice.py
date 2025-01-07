@@ -12,9 +12,9 @@ from ryu.lib.packet import ethernet, ipv4, icmp, tcp, udp, ether_types
 from utils.topology import Connection
 
 class Protocol(Enum):
-    TCP = "tcp"
-    UDP = "udp"
-    ICMP = "icmp"
+    TCP = "TCP"
+    UDP = "UDP"
+    ICMP = "ICMP"
 
     @staticmethod
     def all():
@@ -37,6 +37,12 @@ class Protocol(Enum):
             if p.protocol_id == protocol_id:
                 return p
         raise ValueError("Invalid protocol id")
+        
+    def __str__(self):
+        return self.value
+    
+    def __repr__(self):
+        return f'"{self.value}"'
 
 
 @dataclass
@@ -145,8 +151,7 @@ class Slice:
         return {
             "name": self.name,
             "rules": self.rules,
-            "switches": self.switches,
-            "hosts": self.hosts,
+            "nodes": self.switches + self.hosts,
             "active": self.active,
             "min_rate": self.min_rate,
             "max_rate": self.max_rate

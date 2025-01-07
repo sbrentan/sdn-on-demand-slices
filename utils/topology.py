@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, List
 
 from ryu.base.app_manager import RyuApp
 from ryu.topology.api import get_all_switch, get_all_link, get_all_host
@@ -14,6 +14,7 @@ class TopologyUtils:
     links: Dict[str, Link] = {}
     hosts: Dict[str, Host] = {}
     nodes: Dict[str, Node] = {}
+    connections: List[Connection]
 
     @staticmethod
     def get_all_switches(app: RyuApp) -> Dict[str, Switch]:
@@ -74,7 +75,7 @@ class TopologyUtils:
             dst_node = Node(
                 node_type=NodeType.SWITCH,
                 node_id=dst_node_id,
-                node_ref=switches[dst_node_id] 
+                node_ref=switches[dst_node_id]
             )
             if dst_node_id not in nodes:
                 nodes[dst_node_id] = dst_node
@@ -111,5 +112,6 @@ class TopologyUtils:
         TopologyUtils.links = links
         TopologyUtils.hosts = hosts
         TopologyUtils.nodes = nodes
+        TopologyUtils.connections = connections
         
         return Network(connections=connections)

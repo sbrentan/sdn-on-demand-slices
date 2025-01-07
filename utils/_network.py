@@ -27,6 +27,12 @@ class NodeType(Enum):
             return NodeType.SWITCH
         else:
             raise ValueError(f"Unknown node type for node_id: {node_id}")
+        
+    def __str__(self):
+        return self.value
+    
+    def __repr__(self):
+        return f'"{self.value}"'
 
 
 @dataclass

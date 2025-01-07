@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import time
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.node import OVSKernelSwitch, RemoteController
@@ -54,6 +55,10 @@ class NetworkSlicingTopology(Topo):
         net.addController(controller)  # type: ignore
         net.build()
         net.start()
+        
+        time.sleep(2)
+
+        net.pingAll()
         CLI(net)
         net.stop()
 

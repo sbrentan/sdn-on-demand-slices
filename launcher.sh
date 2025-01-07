@@ -16,14 +16,14 @@ timestamp=$(date +"%Y%m%d_%H%M%S")
 log_file="logs/controller_$timestamp.log"
 
 echo "Starting Ryu controller..."
-# sudo ovs-vsctl set-manager ptcp:6632
+sudo ovs-vsctl set-manager ptcp:6632
 
 ryu-manager --observe-links ryu_app.py > "$log_file" 2>&1 &
 # ryu_manager_pid=$!
 
 # echo "Ryu controller started with PID: $ryu_manager_pid"
 
-sleep 5
+sleep 2
 
 echo "Starting Mininet network..."
 sudo python3 network.py

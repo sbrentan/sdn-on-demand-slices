@@ -120,6 +120,7 @@ class QueueUtils:
     def init_queues(self):
         
         if self.network is None:
+            logging.info("[init_queues] Network is not defined")
             return
         for connection in self.network.connections:
             src_dpid = connection.src[0].dpid

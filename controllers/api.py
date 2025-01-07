@@ -3,12 +3,15 @@ import json, logging
 from webob import Response
 from ryu.app.wsgi import ControllerBase, route
 
+from utils.topology import TopologyUtils, Switch, Host, Node
 from utils.constants import CONTROLLER_INSTANCE_NAME, API_BASE_URL
 
 class Paths:
     
-    TOPOLOGY = '/topology'
     SLICES = '/slices'
+    TOPOLOGY = '/topology'
+    NODES = '/topology/nodes'
+    LINKS = '/topology/links'
 
 for path in Paths.__dict__:
     if not path.startswith("__"):
@@ -28,14 +31,26 @@ class APIController(ControllerBase):
         from ryu_app import DynamicSlicingController
         self.controller_instance: DynamicSlicingController = data[CONTROLLER_INSTANCE_NAME]
 
+    def _json_response(self, data: dict) -> Response:
+        return Response(text=json.dumps(data, default=str), content_type='application/json')
+
     ## ====================================== SLICES ====================================== ##
 
     @route('get_slices', Paths.SLICES, methods=['GET'])
     def get_slices(self, req, **kwargs):
         """REST endpoint to get the slices."""
-        logging.info("APIController: get_slices_endpoint")
-        slices_dict = [slice.to_dict() for slice in self.controller_instance.slices]
-        return Response(text=json.dumps(self.controller_instance.link_to_slice_dict, default=str), content_type='application/json')
+        slices_dict = []
+        slice_links = {}
+        for connection in TopologyUtils.connections:
+            for slice in self.controller_instance.link_to_slice_dict[connection.link_id]:
+                if slice.name not in slice_links:
+                    slice_links[slice.name] = []
+                slice_links[slice.name].append(connection.link_id)
+        for slice in self.controller_instance.slices:
+            slice_dict = slice.to_dict()
+            slice_dict['links'] = slice_links[slice.name]
+            slices_dict.append(slice_dict)
+        return self._json_response(slices_dict)
 
     @route('create_slice', Paths.SLICES, methods=['POST'])
     def create_slice(self, req, **kwargs):
@@ -51,6 +66,33 @@ class APIController(ControllerBase):
 
     ## ====================================== TOPOLOGY ====================================== ##
 
-    @route('get_topology', Paths.TOPOLOGY, methods=['GET'])
-    def get_topology(self, req, **kwargs):
-        """REST endpoint to get the topology."""
+    @route('get_nodes', Paths.NODES, methods=['GET'])
+    def get_nodes(self, req, **kwargs):
+        """REST endpoint to get the topology nodes."""
+        nodes = []
+        hosts = TopologyUtils.get_all_hosts(self.controller_instance)
+        for node_id, node in TopologyUtils.nodes.items():
+            node_dict = {
+                "id": node_id,
+                "type": node.node_type,
+            }
+            if isinstance(node.node_ref, Switch):
+                node_dict["dpid"] = node.node_ref.dp.id
+            elif isinstance(node.node_ref, Host):
+                host = hosts[Node.get_host_id(node.node_ref.mac)]
+                node_dict["ip"] = host.ipv4
+                node_dict["mac"] = host.mac
+            nodes.append(node_dict)
+        return self._json_response(nodes)
+
+    @route('get_links', Paths.LINKS, methods=['GET'])
+    def get_links(self, req, **kwargs):
+        """REST endpoint to get the topology links."""
+        links = []
+        for connection in TopologyUtils.connections:
+            links.append({
+                "id": connection.link_id,
+                "source": connection.src[1].node_id,
+                "target": connection.dst[1].node_id
+            })
+        return self._json_response(links)

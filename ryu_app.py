@@ -7,7 +7,8 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet.packet import Packet
-from ryu.lib.packet import packet, ethernet, ether_types
+from ryu.ofproto import ether
+from ryu.lib.packet import packet, ethernet, ether_types, arp
 from ryu.app.wsgi import WSGIApplication
 
 from controllers.api import APIController
@@ -15,7 +16,7 @@ from controllers.gui import GUIController
 from utils.topology import TopologyUtils, Connection, Node
 from utils.slice import Protocol, Slice, SliceUtils
 from utils.queue import Queue, QueueUtils
-from utils.constants import CONTROLLER_INSTANCE_NAME, FlowPriority
+from utils.constants import CONTROLLER_INSTANCE_NAME, SWITCHES, HOSTS, FlowPriority
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -37,6 +38,9 @@ class DynamicSlicingController(app_manager.RyuApp):
 
         # self.CONF.set_override('ovsdb_timeout', 3)
         # self.CONF.set_default('ovsdb_timeout', 3)
+
+        self.connected_hosts = 0
+        self.connected_switches = 0
 
         # TODO: Load the configuration of the network from get_all_switch/get_all_link (handle also topology changes)
 
@@ -141,18 +145,31 @@ class DynamicSlicingController(app_manager.RyuApp):
         logging.info("link_to_slice dicts: " + str(self.link_to_slice_dict))
         self.slice_utils.link_to_slice_dict = self.link_to_slice_dict
         self.queue_utils.link_to_slice_dict = self.link_to_slice_dict
+        self.queue_utils.network = self.network
         self.queue_utils.init_queues()
 
+    def init_network(self):
+        if self.connected_hosts == HOSTS and self.connected_switches == SWITCHES:
+            # Initialize the data structures to store the slices
+            logging.info("Updating network...")
+            self.network = TopologyUtils.build_network(self)
+            logging.info("Updated network: " + str(self.network))
+
+            self.init_node_connections()
+
+            for _, switch in TopologyUtils.switches.items():
+
+                # set the ovsdb address
+                QueueUtils.set_ovsdb_address(switch.dp.id)
+
+            self.init_slices(self.slices)  # TODO: change
+
     @set_ev_cls(event.EventHostAdd)
-    def host_features_handler(self, ev):
+    def host_add_handler(self, ev):
         logging.info("Host connected: %s", Node.get_host_id(ev.host.mac))
 
-        # Initialize the data structures to store the slices
-        logging.info("Updating network...")
-        self.network = TopologyUtils.build_network(self)
-        logging.info("Updated network: " + str(self.network))
-
-        self.init_node_connections()
+        self.connected_hosts += 1
+        self.init_network()
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
     def switch_features_handler(self, ev):
@@ -161,13 +178,8 @@ class DynamicSlicingController(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         logging.info("Switch connected: %s", datapath.id)
-
-        # Initialize the data structures to store the slices
-        logging.info("Updating network...")
-        self.network = TopologyUtils.build_network(self)
-        logging.info("Updated network: " + str(self.network))
-
-        self.init_node_connections()
+        self.connected_switches += 1
+        self.init_network()
 
         # Install the table-miss flow entry
         match = parser.OFPMatch()
@@ -175,9 +187,6 @@ class DynamicSlicingController(app_manager.RyuApp):
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
         ]
         self.add_flow(datapath, FlowPriority.TABLE_MISS.value, match, actions)
-
-        # set the ovsdb address
-        QueueUtils.set_ovsdb_address(datapath.id)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER) # type: ignore
     def _packet_in_handler(self, ev):
@@ -215,29 +224,9 @@ class DynamicSlicingController(app_manager.RyuApp):
 
         # for each slice, set the mac to port for the incoming port
         slices = self.slice_utils.get_slices_from_packet(switch_id, pkt, in_connection)
-        slices_to_save = slices
-        # if not slices and len(self.link_to_slice_dict[in_connection.link_id]) == 0:
-        #     slices_to_save = [None]
 
-        for slice in slices_to_save:
-            slice_id = Slice.get_slice_id(slice)
-            queue = in_connection.get_queue_for_slice(slice)
-            result = self._get_port_for_mac_and_slice(switch_id, slice_id, src)
-            if not result:
-                self._set_port_for_mac_and_slice(switch_id, slice_id, src, in_port, queue)
-                
-                match_conditions = self._get_match_conditions_for_slice(slice, pkt, invert_src_dst=True)
-                match = datapath.ofproto_parser.OFPMatch(**match_conditions)
-                actions = [
-                    datapath.ofproto_parser.OFPActionSetQueue(queue.queue_id),
-                    datapath.ofproto_parser.OFPActionOutput(in_port)
-                ]
-                self.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
-                logging.info(f"Flow added for slice {Slice.get_slice_id(slice)} to send packet to port {in_port} with queue {queue.queue_id}")
-        
         # check if the packet belongs to a slice and send it to the corresponding port
-        # TODO: comment following code?
-        for slice in slices_to_save:
+        for slice in slices:
             result = self._get_port_for_mac_and_slice(switch_id, Slice.get_slice_id(slice), dst)
             if result:
                 out_port, queue_id = result
@@ -395,6 +384,7 @@ class DynamicSlicingController(app_manager.RyuApp):
                     conditions.update({("udp_src" if pkt_protocol == Protocol.UDP else "tcp_src"): src_port})
             logging.info(f"[_get_match_condictions_for_packet] Match conditions for packet: {json.dumps(conditions, indent=4)}")
         return conditions
+
 
 app_manager.require_app('ryu.app.rest_qos') # Needed for managing queues
 app_manager.require_app('ryu.app.rest_conf_switch') # Needed for updating ovdb address
