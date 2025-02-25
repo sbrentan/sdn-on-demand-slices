@@ -3,6 +3,18 @@ SDN On-demand dynamic slicing software using comnetsemu.
 
 This project is realized for the Networking 2 Master course of University of Trento
 
+## Project setup
+
+Install all the dependencies with the following:
+```sh
+pip install -r requirements.txt
+```
+
+In order to make wsgi accessible from the host machine, remember to add the following forwarded port into the Vagrantfile:
+```vagrantfile
+comnetsemu.vm.network "forwarded_port", guest: 8080, host: 8086
+```
+
 ## Main commands
 
 
