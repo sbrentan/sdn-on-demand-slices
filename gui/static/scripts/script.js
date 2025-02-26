@@ -1,5 +1,28 @@
 const API_BASE_URL = 'http://localhost:8086/api';
+const GUI_BASE_URL = 'http://localhost:8086/gui/';
 
+async function fetchComponent(component, method = 'GET') {
+    try {
+        const response = await fetch(GUI_BASE_URL + component, { method });
+        if (!response.ok) {
+            throw new Error(`Error: ${response.status} - ${response.statusText}`);
+        }
+
+        return await response.text();
+    } catch (error) {
+        console.error(`Failed to fetch component ${component}:`, error);
+        throw error;
+    }
+}
+
+async function loadComponent(component, targetId) {
+    try {
+        const componentHtml = await fetchComponent(component);
+        document.getElementById(targetId).innerHTML = componentHtml;
+    } catch (error) {
+        console.error(`Failed to load component ${component}:`, error);
+    }
+}
 
 // Generic function to fetch data from an endpoint
 async function fetchData(endpoint, method = 'GET', body = null) {
@@ -84,8 +107,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const savedLayout = getCookie("networkLayout");
     const data = savedLayout ? JSON.parse(savedLayout) : defaultData;
 
-    const width = 800; //document.getElementById("network-graph").clientWidth;
-    const height = 400;
+    const ratio = 0.8;
+    const width = document.getElementById("network-graph").clientWidth * ratio;
+    const height = document.getElementById("network-graph").clientHeight * ratio;
 
     const svg = d3.select("#network-graph")
         .attr("viewBox", `0 0 ${width} ${height}`);

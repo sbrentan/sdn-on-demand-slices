@@ -16,10 +16,8 @@ API_BASE_URL = "/api"
 GUI_BASE_URL = "/gui"
 
 # GUI Controller Constants
-GUI_BASE_PATH = "./gui/"
-HTML_PATH = GUI_BASE_PATH + "html/"
-CSS_PATH = GUI_BASE_PATH + "css/"
-SCRIPT_PATH = GUI_BASE_PATH + "scripts/"
+STATIC_DIR = "gui/static"
+TEMPLATE_DIR = "gui/templates"
 
 class FlowPriority(Enum):
     TABLE_MISS = 0

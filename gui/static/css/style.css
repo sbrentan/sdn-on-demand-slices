@@ -1,0 +1,101 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    overflow: hidden;   
+}
+
+#title {
+    height: 50px;
+    text-align: center;
+
+}
+
+#app {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: calc( 100vh - 50px );
+}
+
+#network-graph {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed #aaa;
+}
+
+#controls {
+    padding: 10px;
+    background-color: #f4f4f4;
+    border-right: 1px solid #ddd;
+}
+
+#sidebar {
+    width: 300px;
+    padding: 10px;
+    background-color: #f4f4f4;
+    border-right: 1px solid #ddd;
+}
+
+#sidebar h2 {
+    margin-top: 0;
+}
+
+#slice-list {
+    list-style: none;
+    padding: 0;
+}
+
+#slice-list li {
+    border: 1px solid #ddd;
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #fff;
+    transition: background-color 0.3s;
+}
+
+#slice-list li:hover {
+    background-color: #e0f7fa;
+}
+
+#graph-container {
+    flex: 1;
+    overflow: auto;
+    padding: 10px;
+}
+
+#details-menu{
+    display: flex;
+    flex-direction: row;
+    transition: width 0.3s ease;
+    background-color: #d9d5d5;
+    border-radius: 5px 0 0 5px;
+}
+#details-menu.closed {
+    width: 0px;
+}
+#details-menu.opened {
+    width: 300px;
+}
+
+#fetch-component {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+#details-menu .details-container {
+    transition: opacity 0.3s ease 0.2s;
+    padding: 10px;
+    width: 100%;
+}
+#details-menu.closed .details-container {
+    opacity: 0;
+}
+#details-menu.opened .details-container {
+    opacity: 1;
+}
+#details-menu .details-container > div.row {
+    padding: 0 10px;
+}

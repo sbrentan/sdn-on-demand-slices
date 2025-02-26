@@ -11,12 +11,13 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
 
         <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script src="https://unpkg.com/htmx.org@1.6.1"></script>
 
-        <link rel="stylesheet" type="text/css" href="css/main.css">
-        <script src="scripts/main.js"></script>
+        <link rel="stylesheet" type="text/css" href="{{ Paths.STATIC('css/style.css') }}">
+        <script src="{{ Paths.STATIC('scripts/script.js') }}"></script>
     </head>
     <body>
-        <h1>SDN On-Demand Slices</h1>
+        <h1 id="title">SDN On-Demand Slices</h1>
         <div id="app">
             <!-- <h1>Network Topology</h1> -->
             <div id="controls">
@@ -29,6 +30,24 @@
             <div id="graph-container">
                 <svg id="network-graph"></svg>
             </div>
+            <div id="details-menu" class="closed">
+                <div id='details-container' class="details-container"></div>
+            </div>
         </div>
+            
+        <button id="fetch-component"
+            hx-get="{{ Paths.SWITCH_DETAILS('s1') }}"
+            hx-target="#details-container"
+            hx-swap="innerHTML"
+        >Fetch Component</button>
     </body>
 </html>
+
+<script>
+    button = document.querySelector('#fetch-component');
+    button.addEventListener('htmx:beforeRequest', function(event) {
+        menu = document.querySelector('#details-menu');
+        menu.classList.add('opened');
+        menu.classList.remove('closed');
+    });
+</script>

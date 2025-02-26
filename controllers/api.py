@@ -4,30 +4,14 @@ from webob import Response
 from ryu.app.wsgi import ControllerBase, route
 
 from utils.topology import TopologyUtils, Switch, Host, Node
-from utils.constants import CONTROLLER_INSTANCE_NAME, API_BASE_URL
+from utils.constants import CONTROLLER_INSTANCE_NAME
+from controllers.utils.paths import ApiPaths
 
-class Paths:
-    
-    SLICES = '/slices'
-    TOPOLOGY = '/topology'
-    NODES = '/topology/nodes'
-    LINKS = '/topology/links'
-
-for path in Paths.__dict__:
-    if not path.startswith("__"):
-        # if API_BASE_URL is not present in the path, add it
-        if API_BASE_URL not in Paths.__dict__[path][::len(API_BASE_URL)]:
-            setattr(Paths, path, API_BASE_URL + getattr(Paths, path))
-
-logging.info(f"[APIController] Loaded paths:")
-for path in Paths.__dict__:
-    if not path.startswith("__"):
-        logging.info(f"\t- {path}: {getattr(Paths, path)}")
 
 class APIController(ControllerBase):
     def __init__(self, req, link, data, **config):
         super(APIController, self).__init__(req, link, data, **config)
-        logging.info("APIController initialized")
+
         from ryu_app import DynamicSlicingController
         self.controller_instance: DynamicSlicingController = data[CONTROLLER_INSTANCE_NAME]
 
@@ -36,7 +20,7 @@ class APIController(ControllerBase):
 
     ## ====================================== SLICES ====================================== ##
 
-    @route('get_slices', Paths.SLICES, methods=['GET'])
+    @route('get_slices', ApiPaths.SLICES(), methods=['GET'])
     def get_slices(self, req, **kwargs):
         """REST endpoint to get the slices."""
         slices_dict = []
@@ -52,21 +36,21 @@ class APIController(ControllerBase):
             slices_dict.append(slice_dict)
         return self._json_response(slices_dict)
 
-    @route('create_slice', Paths.SLICES, methods=['POST'])
+    @route('create_slice', ApiPaths.SLICES(), methods=['POST'])
     def create_slice(self, req, **kwargs):
         """REST endpoint to create a slice."""
 
-    @route('update_slice', Paths.SLICES, methods=['PUT'])
+    @route('update_slice', ApiPaths.SLICES(), methods=['PUT'])
     def update_slice(self, req, **kwargs):
         """REST endpoint to update a slice."""
 
-    @route('delete_slice', Paths.SLICES, methods=['DELETE'])
+    @route('delete_slice', ApiPaths.SLICES(), methods=['DELETE'])
     def delete_slice(self, req, **kwargs):
         """REST endpoint to delete a slice."""
 
     ## ====================================== TOPOLOGY ====================================== ##
 
-    @route('get_nodes', Paths.NODES, methods=['GET'])
+    @route('get_nodes', ApiPaths.NODES(), methods=['GET'])
     def get_nodes(self, req, **kwargs):
         """REST endpoint to get the topology nodes."""
         nodes = []
@@ -85,7 +69,49 @@ class APIController(ControllerBase):
             nodes.append(node_dict)
         return self._json_response(nodes)
 
-    @route('get_links', Paths.LINKS, methods=['GET'])
+    @route('get_switches', ApiPaths.SWITCHES(), methods=['GET'])
+    def get_switches(self, req, **kwargs):
+        """REST endpoint to get the topology switches."""
+        switches = []
+        for switch_id, switch in TopologyUtils.switches.items():
+            switches.append({
+                "id": switch_id,
+                "dpid": switch.dp.id
+            })
+        return self._json_response(switches)    
+    
+    @route('get_switch', ApiPaths.SWITCH(), methods=['GET'])
+    def get_switch(self, req, switch_id, **kwargs):
+        """REST endpoint to get the details of a specific switch."""
+        switch = TopologyUtils.switches[switch_id]
+        return self._json_response({
+            "id": switch_id,
+            "dpid": switch.dp.id
+        })
+    
+    @route('get_hosts', ApiPaths.HOSTS(), methods=['GET'])
+    def get_hosts(self, req, **kwargs):
+        """REST endpoint to get the topology hosts."""
+        hosts = []
+        for host_id, host in TopologyUtils.hosts.items():
+            hosts.append({
+                "id": host_id,
+                "ip": host.ipv4,
+                "mac": host.mac
+            })
+        return self._json_response(hosts)
+    
+    @route('get_host', ApiPaths.HOST(), methods=['GET'])
+    def get_host(self, req, host_id, **kwargs):
+        """REST endpoint to get the details of a specific host."""
+        host = TopologyUtils.hosts[host_id]
+        return self._json_response({
+            "id": host_id,
+            "ip": host.ipv4,
+            "mac": host.mac
+        })
+
+    @route('get_links', ApiPaths.LINKS(), methods=['GET'])
     def get_links(self, req, **kwargs):
         """REST endpoint to get the topology links."""
         links = []
