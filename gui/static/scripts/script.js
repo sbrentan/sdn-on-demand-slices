@@ -55,6 +55,26 @@ function getRandomColor() {
     return color;
 }
 
+async function fetchMenuDetails (url) {
+    const menu = document.getElementById('details-menu');
+    const target = document.getElementById('details-container');
+    // add class
+    menu.classList.add('opened');
+    menu.classList.remove('closed');
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+
+        // Insert the response into the target element
+        target.innerHTML = await response.text();
+    } catch (error) {
+        console.error('Fetch Error:', error);
+        target.innerHTML = '<p>Error loading content.</p>';
+    }
+}
+
+
 function renderGraph(data, slices) {
     
     const width = document.getElementById("network-graph").clientWidth;
@@ -87,7 +107,7 @@ function renderGraph(data, slices) {
         .attr("stroke", "none") // Default state (no outline)
         .attr("stroke-width", 2)
         .call(drag(simulation))
-        .on("click", function(event, d) {
+        .on("click", async function(event, d) {
             event.stopPropagation();
 
             console.log("Clicked node:", d);
@@ -99,6 +119,7 @@ function renderGraph(data, slices) {
             d3.select(this)
                 .attr("stroke", "#4D90FE")
                 .attr("stroke-width", 3);
+            await fetchMenuDetails(`/gui/menu/details/${d.type.toLowerCase()}/${d.id}`);
         }); 
 
     const label = svg.append("g")

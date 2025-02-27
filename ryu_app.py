@@ -7,8 +7,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet.packet import Packet
-from ryu.ofproto import ether
-from ryu.lib.packet import packet, ethernet, ether_types, arp
+from ryu.lib.packet import packet, ethernet, ether_types
 from ryu.app.wsgi import WSGIApplication
 
 from controllers.api import APIController
@@ -19,6 +18,7 @@ from utils.queue import Queue, QueueUtils
 from utils.constants import CONTROLLER_INSTANCE_NAME, SWITCHES, HOSTS, FlowPriority
 
 logging.basicConfig(level=logging.DEBUG)
+
 
 class DynamicSlicingController(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]

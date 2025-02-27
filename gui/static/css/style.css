@@ -103,6 +103,32 @@ body {
     background-color: #d9d5d5;
     border-radius: 5px 0 0 5px;
 }
+#details-menu .close-menu-btn {
+    content: '\00d7';
+    top: 5px;
+    right: 5px;
+    font-size: 20px;
+    cursor: pointer;
+    height: 30px;
+    width: 32px;
+    text-align: center;
+    border-radius: 15px;
+    display:flex;
+    justify-content: center;
+    align-items: center;
+    margin: 10px 10px 0 0;
+    transition: opacity 0.3s ease 0.2s, background-color 0.3s ease;
+    border: 0px;
+}
+#details-menu .close-menu-btn:after {
+    content: '\00d7';
+}
+#details-menu .close-menu-btn:hover {
+    background-color: #bbb;
+}
+#details-menu .close-menu-btn:active {
+    background-color: #999;
+}
 #details-menu.closed {
     width: 0px;
 }
@@ -115,12 +141,30 @@ body {
     padding: 10px;
     width: 100%;
 }
-#details-menu.closed .details-container {
+#details-menu.closed .details-container{
     opacity: 0;
 }
-#details-menu.opened .details-container {
+#details-menu.closed .close-menu-btn {
+    opacity: 0;
+    visibility: hidden;
+}
+#details-menu.opened .details-container{
     opacity: 1;
+}
+#details-menu.opened .close-menu-btn {
+    opacity: 1;
+    visibility: visible;
 }
 #details-menu .details-container > div.row {
     padding: 0 10px;
+}
+.details-container h3 {
+    padding: 5px 0 0 5px;
+}
+
+.form-group input {
+    margin-bottom: 10px;
+}
+.form-group label {
+    margin-bottom: 5px;
 }

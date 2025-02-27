@@ -50,6 +50,7 @@
             </div>
             <div id="details-menu" class="closed">
                 <div id='details-container' class="details-container"></div>
+                <div class="close-menu-btn"></div>
             </div>
         </div>
     </body>
@@ -61,5 +62,13 @@
         menu = document.querySelector('#details-menu');
         menu.classList.add('opened');
         menu.classList.remove('closed');
+    });
+
+    close_button = document.querySelector('.close-menu-btn');
+    close_button.addEventListener('click', function(event) {
+        menu = document.querySelector('#details-menu');
+        menu.classList.add('closed');
+        menu.classList.remove('opened');
+        document.querySelector('#details-container').innerHTML = '';
     });
 </script>
