@@ -6,7 +6,7 @@ const GUI_BASE_URL = 'http://localhost:8086/gui/';
 const OUTLINE_COLOR = "#FF6347"; 
 const NODE_SIZE = 35;    
 
-var data = undefined;
+var graph_data = undefined;
 var ratio = 1.25;
 var outlineFilter = undefined;
 
@@ -42,9 +42,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Retrieve saved layout from cookie
     const savedLayout = getCookie("networkLayout");
-    data = savedLayout ? JSON.parse(savedLayout) : defaultData;
+    graph_data = savedLayout ? JSON.parse(savedLayout) : defaultData;
 
-    renderGraph(data, slices);
+    renderGraph(graph_data, slices);
 });
 
 function getRandomColor() {
@@ -120,7 +120,7 @@ function renderGraph(data, slices) {
     outlineFilter.append("feMorphology")
         .attr("in", "SourceAlpha")
         .attr("operator", "dilate")
-        .attr("radius", "2")
+        .attr("radius", "3")
         .attr("result", "dilated");
 
     outlineFilter.append("feFlood")
@@ -198,8 +198,6 @@ function renderGraph(data, slices) {
         .attr("href", d => d.type === "Host" ? '/gui/static/images/server.png' : '/gui/static/images/switch.png')
         .attr("width", NODE_SIZE)
         .attr("height", NODE_SIZE)
-        .attr("x", d => d.x || 0)
-        .attr("y", d => d.y || 0)
         .attr("cursor", "pointer")
         .call(drag(simulation))
         .on("click", async function(event, d) {
@@ -223,7 +221,7 @@ function renderGraph(data, slices) {
         .data(data.nodes)
         .enter()
         .append("text")
-        .attr("dy", -15)
+        .attr("dy", -20)
         .attr("text-anchor", "middle")
         .text(d => d.id);
 
