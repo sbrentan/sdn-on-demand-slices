@@ -3,13 +3,12 @@ const GUI_BASE_URL = 'http://localhost:8086/gui/';
 
 /* ---------------------- Global variable ---------------------- */
 
-const HOST_COLOR = "#4682B4";
-const SWITCH_COLOR = "#FF6347";
 const OUTLINE_COLOR = "#FF6347"; 
 const NODE_SIZE = 35;    
 
 var data = undefined;
 var ratio = 1.25;
+var outlineFilter = undefined;
 
 /* ----------------------- Onload helper ----------------------- */
 
@@ -49,12 +48,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function getRandomColor() {
-    var letters = '0123456789ABCDEF';
-    var color = '#';
-    for (var i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
+
+    const colors = [
+        "#ffbe0b",
+        "#fb5607",
+        "#3590f3"
+    ];
+
+    return colors[Math.floor(Math.random() * colors.length)];
 }
 
 async function fetchMenuDetails (url) {
@@ -78,10 +79,14 @@ async function fetchMenuDetails (url) {
 
 function highlightSlice(component, slice) {
     const sliceColor = component.querySelector(".slice-color").style.backgroundColor;
-    let node = d3.selectAll("circle");
+    let node = d3.selectAll("image");
     let link = d3.selectAll("line");
-    node.attr("fill", d => slice.nodes.includes(d.id) ? sliceColor : d.type === "Host" ? HOST_COLOR : SWITCH_COLOR);
-    link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa").attr("stroke-width", 2);
+
+    outlineFilter.select("feFlood").attr("flood-color", sliceColor);
+    node.attr("filter", d => slice.nodes.includes(d.id) ? "url(#outlineFilter)" : null);
+
+    // line stroke 4 if link is in slice, else 2
+    link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa").attr("stroke-width", d => slice.links.includes(d.id) ? 4 : 2);
 }
 
 function deselectAll() {
@@ -106,6 +111,31 @@ function renderGraph(data, slices) {
         .on("click", () => {
             // deselectAll();
         });
+    
+    // define the outline filter for the svg image selection
+    const defs = svg.append("defs");
+    outlineFilter = defs.append("filter")
+        .attr("id", "outlineFilter");
+
+    outlineFilter.append("feMorphology")
+        .attr("in", "SourceAlpha")
+        .attr("operator", "dilate")
+        .attr("radius", "2")
+        .attr("result", "dilated");
+
+    outlineFilter.append("feFlood")
+        .attr("flood-color", OUTLINE_COLOR)
+        .attr("result", "flooded");
+
+    outlineFilter.append("feComposite")
+        .attr("in", "flooded")
+        .attr("in2", "dilated")
+        .attr("operator", "in")
+        .attr("result", "outlined");
+
+    const feMerge = outlineFilter.append("feMerge");
+    feMerge.append("feMergeNode").attr("in", "outlined");
+    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
     const simulation = d3.forceSimulation(data.nodes)
         .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
@@ -128,31 +158,6 @@ function renderGraph(data, slices) {
             .attr("x", d => d.x)
             .attr("y", d => d.y);
     });
-    
-    // define the outline filter for the svg image selection
-    const defs = svg.append("defs");
-    const outlineFilter = defs.append("filter")
-        .attr("id", "outlineFilter");
-
-    outlineFilter.append("feMorphology")
-        .attr("in", "SourceAlpha")
-        .attr("operator", "dilate")
-        .attr("radius", "2")
-        .attr("result", "dilated");
-
-    outlineFilter.append("feFlood")
-        .attr("flood-color", OUTLINE_COLOR)
-        .attr("result", "flooded");
-
-    outlineFilter.append("feComposite")
-        .attr("in", "flooded")
-        .attr("in2", "dilated")
-        .attr("operator", "in")
-        .attr("result", "outlined");
-
-    const feMerge = outlineFilter.append("feMerge");
-    feMerge.append("feMergeNode").attr("in", "outlined");
-    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
     const link = svg.append("g")
         .attr("class", "links")
@@ -190,7 +195,7 @@ function renderGraph(data, slices) {
         .data(data.nodes)
         .enter()
         .append("image")
-        .attr("href", d => d.type === "Host" ? '/gui/static/images/end_device.png' : '/gui/static/images/switch.png')
+        .attr("href", d => d.type === "Host" ? '/gui/static/images/server.png' : '/gui/static/images/switch.png')
         .attr("width", NODE_SIZE)
         .attr("height", NODE_SIZE)
         .attr("x", d => d.x || 0)
@@ -205,6 +210,7 @@ function renderGraph(data, slices) {
             deselectAll();
 
             // Highlight the clicked node
+            outlineFilter.select("feFlood").attr("flood-color", OUTLINE_COLOR);
             d3.select(this)
                 .attr("filter", "url(#outlineFilter)");
     
