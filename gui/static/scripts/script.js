@@ -5,7 +5,8 @@ const GUI_BASE_URL = 'http://localhost:8086/gui/';
 
 const HOST_COLOR = "#4682B4";
 const SWITCH_COLOR = "#FF6347";
-const OUTLINE_COLOR = "#4D90FE";    
+const OUTLINE_COLOR = "#FF6347"; 
+const NODE_SIZE = 35;    
 
 var data = undefined;
 var ratio = 1.25;
@@ -65,7 +66,7 @@ function renderGraph(data, slices) {
         .attr("viewBox", `0 0 ${width} ${height}`)
         .on("click", () => {
             // Remove all outlines
-            d3.selectAll("circle").attr("stroke", "none");
+            d3.selectAll("image").attr("filter", null);
             d3.selectAll("line").attr("stroke", "#aaa").attr("stroke-width", 2);
         });
 
@@ -73,6 +74,48 @@ function renderGraph(data, slices) {
         .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
         .force("charge", d3.forceManyBody().strength(-300))
         .force("center", d3.forceCenter(width / 2, height / 2));
+
+    simulation.on("tick", () => {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+
+        // For images, use 'x' and 'y' attributes and adjust by half the image width/height (10)
+        node
+            .attr("x", d => d.x - 15)
+            .attr("y", d => d.y - 15);
+
+        label
+            .attr("x", d => d.x)
+            .attr("y", d => d.y);
+    });
+    
+    // define the outline filter for the svg image selection
+    const defs = svg.append("defs");
+    const outlineFilter = defs.append("filter")
+        .attr("id", "outlineFilter");
+
+    outlineFilter.append("feMorphology")
+        .attr("in", "SourceAlpha")
+        .attr("operator", "dilate")
+        .attr("radius", "2")
+        .attr("result", "dilated");
+
+    outlineFilter.append("feFlood")
+        .attr("flood-color", OUTLINE_COLOR)
+        .attr("result", "flooded");
+
+    outlineFilter.append("feComposite")
+        .attr("in", "flooded")
+        .attr("in2", "dilated")
+        .attr("operator", "in")
+        .attr("result", "outlined");
+
+    const feMerge = outlineFilter.append("feMerge");
+    feMerge.append("feMergeNode").attr("in", "outlined");
+    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
     const link = svg.append("g")
         .attr("class", "links")
@@ -82,48 +125,59 @@ function renderGraph(data, slices) {
         .append("line")
         .attr("stroke", "#aaa")
         .attr("stroke-width", 2)
+        .attr("cursor", "pointer")
+        .on("mouseover", function() {
+            d3.select(this).attr("stroke-width", 4);
+        })
+        .on("mouseout", function() {
+            if (d3.select(this).attr("stroke") !== OUTLINE_COLOR) {
+                d3.select(this).attr("stroke-width", 2);
+            }
+        })
         .on("click", function(event, d) {
             event.stopPropagation();
 
             console.log("Clicked link:", d);
 
             // Remove outline from all circles first
-            d3.selectAll("circle").attr("stroke", "none");
+            d3.selectAll("image").attr("filter", null);
             
             link.attr("stroke", "#aaa").attr("stroke-width", 2);
 
             // Highlight the clicked link
             d3.select(this)
                 .attr("stroke", OUTLINE_COLOR)
-                .attr("stroke-width", 3);
+                .attr("stroke-width", 4);
         });
-
     
     const node = svg.append("g")
         .attr("class", "nodes")
-        .selectAll("circle")
+        .selectAll("image")
         .data(data.nodes)
         .enter()
-        .append("circle")
-        .attr("r", 10)
-        .attr("fill", d => d.type === "Host" ? HOST_COLOR : SWITCH_COLOR)
-        .attr("stroke", "none") // Default state (no outline)
-        .attr("stroke-width", 2)
+        .append("image")
+        .attr("href", d => d.type === "Host" ? '/gui/static/images/end_device.png' : '/gui/static/images/switch.png')
+        .attr("width", NODE_SIZE)
+        .attr("height", NODE_SIZE)
+        .attr("x", d => d.x || 0)
+        .attr("y", d => d.y || 0)
+        .attr("cursor", "pointer")
         .call(drag(simulation))
         .on("click", function(event, d) {
             event.stopPropagation();
 
             console.log("Clicked node:", d);
-    
-            // Remove outline from all circles first
-            node.attr("stroke", "none");
+
+            // Remove the outlines from all links
             link.attr("stroke", "#aaa").attr("stroke-width", 2);
-    
-            // Highlight the clicked circle
+
+            // Remove outline from all images
+            d3.selectAll("image").attr("filter", null);
+
+            // Highlight the clicked node
             d3.select(this)
-                .attr("stroke", OUTLINE_COLOR)
-                .attr("stroke-width", 3);
-        }); 
+                .attr("filter", "url(#outlineFilter)");
+        });
 
     const label = svg.append("g")
         .attr("class", "labels")
@@ -134,22 +188,6 @@ function renderGraph(data, slices) {
         .attr("dy", -15)
         .attr("text-anchor", "middle")
         .text(d => d.id);
-
-    simulation.on("tick", () => {
-        link
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
-
-        node
-            .attr("cx", d => d.x)
-            .attr("cy", d => d.y);
-
-        label
-            .attr("x", d => d.x)
-            .attr("y", d => d.y);
-    });
 
     function drag(simulation) {
         return d3.drag()
