@@ -5,6 +5,7 @@ const GUI_BASE_URL = 'http://localhost:8086/gui/';
 
 const HOST_COLOR = "#4682B4";
 const SWITCH_COLOR = "#FF6347";
+const OUTLINE_COLOR = "#4D90FE";    
 
 var data = undefined;
 var ratio = 1.25;
@@ -61,7 +62,12 @@ function renderGraph(data, slices) {
     const height = document.getElementById("network-graph").clientHeight;
 
     const svg = d3.select("#network-graph")
-        .attr("viewBox", `0 0 ${width} ${height}`);
+        .attr("viewBox", `0 0 ${width} ${height}`)
+        .on("click", () => {
+            // Remove all outlines
+            d3.selectAll("circle").attr("stroke", "none");
+            d3.selectAll("line").attr("stroke", "#aaa").attr("stroke-width", 2);
+        });
 
     const simulation = d3.forceSimulation(data.nodes)
         .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
@@ -74,7 +80,24 @@ function renderGraph(data, slices) {
         .data(data.links)
         .enter()
         .append("line")
-        .attr("stroke", "#aaa");
+        .attr("stroke", "#aaa")
+        .attr("stroke-width", 2)
+        .on("click", function(event, d) {
+            event.stopPropagation();
+
+            console.log("Clicked link:", d);
+
+            // Remove outline from all circles first
+            d3.selectAll("circle").attr("stroke", "none");
+            
+            link.attr("stroke", "#aaa").attr("stroke-width", 2);
+
+            // Highlight the clicked link
+            d3.select(this)
+                .attr("stroke", OUTLINE_COLOR)
+                .attr("stroke-width", 3);
+        });
+
     
     const node = svg.append("g")
         .attr("class", "nodes")
@@ -94,10 +117,11 @@ function renderGraph(data, slices) {
     
             // Remove outline from all circles first
             node.attr("stroke", "none");
+            link.attr("stroke", "#aaa").attr("stroke-width", 2);
     
             // Highlight the clicked circle
             d3.select(this)
-                .attr("stroke", "#4D90FE")
+                .attr("stroke", OUTLINE_COLOR)
                 .attr("stroke-width", 3);
         }); 
 
@@ -151,13 +175,14 @@ function renderGraph(data, slices) {
         if (event.target.tagName === "SPAN") target = event.target.parentElement;
         console.log(target.dataset.index);
         const selectedSlice = slices[target.dataset.index];
-        highlightSlice(target, selectedSlice);
+        console.log(selectedSlice);
+        if (selectedSlice !== undefined) highlightSlice(target, selectedSlice);
     });
 
     function highlightSlice(component, slice) {
         const sliceColor = component.querySelector(".slice-color").style.backgroundColor;
         node.attr("fill", d => slice.nodes.includes(d.id) ? sliceColor : d.type === "Host" ? HOST_COLOR : SWITCH_COLOR);
-        link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa");
+        link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa").attr("stroke-width", 2);
     }
 }
 
@@ -266,7 +291,7 @@ async function fetchData(endpoint, method = 'GET', body = null) {
         }
 
         response_json = await response.json();
-        console.log('Response json:', JSON.stringify(response_json, null, 2));
+        // console.log('Response json:', JSON.stringify(response_json, null, 2));
         return response_json
     } catch (error) {
         console.error(`Failed to fetch data from ${endpoint}:`, error);
