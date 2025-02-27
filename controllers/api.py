@@ -1,4 +1,5 @@
 import json, logging
+from typing import Union
 
 from webob import Response
 from ryu.app.wsgi import ControllerBase, route
@@ -15,10 +16,10 @@ class APIController(ControllerBase):
         from ryu_app import DynamicSlicingController
         self.controller_instance: DynamicSlicingController = data[CONTROLLER_INSTANCE_NAME]
 
-    def _json_response(self, data: dict) -> Response:
+    def _json_response(self, data: Union[dict, list]) -> Response:
         return Response(text=json.dumps(data, default=str), content_type='application/json')
 
-    ## ====================================== SLICES ====================================== ##
+    # ====================================== SLICES ====================================== #
 
     @route('get_slices', ApiPaths.SLICES(), methods=['GET'])
     def get_slices(self, req, **kwargs):
@@ -36,6 +37,20 @@ class APIController(ControllerBase):
             slices_dict.append(slice_dict)
         return self._json_response(slices_dict)
 
+    @route('get_slice', ApiPaths.SLICE(), methods=['GET'])
+    def get_slice(self, req, slice_id, **kwargs):
+        """REST endpoint to get the details of a specific slice."""
+        slice = [s for s in self.controller_instance.slices if s.name == slice_id]
+        if not slice:
+            return Response(status="404 Not Found")
+        slice_dict = slice[0].to_dict()
+        slice_links = []
+        for connection in TopologyUtils.connections:
+            if slice[0] in self.controller_instance.link_to_slice_dict[connection.link_id]:
+                slice_links.append(connection.link_id)
+        slice_dict['links'] = slice_links
+        return self._json_response(slice_dict)
+
     @route('create_slice', ApiPaths.SLICES(), methods=['POST'])
     def create_slice(self, req, **kwargs):
         """REST endpoint to create a slice."""
@@ -48,7 +63,7 @@ class APIController(ControllerBase):
     def delete_slice(self, req, **kwargs):
         """REST endpoint to delete a slice."""
 
-    ## ====================================== TOPOLOGY ====================================== ##
+    # ====================================== TOPOLOGY ====================================== #
 
     @route('get_nodes', ApiPaths.NODES(), methods=['GET'])
     def get_nodes(self, req, **kwargs):

@@ -57,6 +57,45 @@ function getRandomColor() {
     return color;
 }
 
+async function fetchMenuDetails (url) {
+    const menu = document.getElementById('details-menu');
+    const target = document.getElementById('details-container');
+    // add class
+    menu.classList.add('opened');
+    menu.classList.remove('closed');
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+
+        // Insert the response into the target element
+        target.innerHTML = await response.text();
+    } catch (error) {
+        console.error('Fetch Error:', error);
+        target.innerHTML = '<p>Error loading content.</p>';
+    }
+}
+
+function highlightSlice(component, slice) {
+    const sliceColor = component.querySelector(".slice-color").style.backgroundColor;
+    let node = d3.selectAll("circle");
+    let link = d3.selectAll("line");
+    node.attr("fill", d => slice.nodes.includes(d.id) ? sliceColor : d.type === "Host" ? HOST_COLOR : SWITCH_COLOR);
+    link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa").attr("stroke-width", 2);
+}
+
+function deselectAll() {
+    d3.selectAll("image").attr("filter", null);
+    d3.selectAll("line").attr("stroke", "#aaa").attr("stroke-width", 2);
+
+
+    // remove selection from all slices
+    const sliceList = document.getElementById("slice-list");
+    highlightSlice(sliceList, { nodes: [], links: [] });
+    const slices = sliceList.querySelectorAll(".list-group-item");
+    slices.forEach(slice => slice.classList.remove("selected"));
+}
+
 function renderGraph(data, slices) {
     
     const width = document.getElementById("network-graph").clientWidth;
@@ -65,9 +104,7 @@ function renderGraph(data, slices) {
     const svg = d3.select("#network-graph")
         .attr("viewBox", `0 0 ${width} ${height}`)
         .on("click", () => {
-            // Remove all outlines
-            d3.selectAll("image").attr("filter", null);
-            d3.selectAll("line").attr("stroke", "#aaa").attr("stroke-width", 2);
+            // deselectAll();
         });
 
     const simulation = d3.forceSimulation(data.nodes)
@@ -139,10 +176,7 @@ function renderGraph(data, slices) {
 
             console.log("Clicked link:", d);
 
-            // Remove outline from all circles first
-            d3.selectAll("image").attr("filter", null);
-            
-            link.attr("stroke", "#aaa").attr("stroke-width", 2);
+            deselectAll();
 
             // Highlight the clicked link
             d3.select(this)
@@ -163,21 +197,19 @@ function renderGraph(data, slices) {
         .attr("y", d => d.y || 0)
         .attr("cursor", "pointer")
         .call(drag(simulation))
-        .on("click", function(event, d) {
+        .on("click", async function(event, d) {
             event.stopPropagation();
 
             console.log("Clicked node:", d);
 
-            // Remove the outlines from all links
-            link.attr("stroke", "#aaa").attr("stroke-width", 2);
-
-            // Remove outline from all images
-            d3.selectAll("image").attr("filter", null);
+            deselectAll();
 
             // Highlight the clicked node
             d3.select(this)
                 .attr("filter", "url(#outlineFilter)");
-        });
+    
+            await fetchMenuDetails(`/gui/menu/details/${d.type.toLowerCase()}/${d.id}`);
+        }); 
 
     const label = svg.append("g")
         .attr("class", "labels")
@@ -208,20 +240,21 @@ function renderGraph(data, slices) {
     }
 
     const sliceList = document.getElementById("slice-list");
-    sliceList.addEventListener("click", event => {
+    sliceList.addEventListener("click", async function (event) {
         let target = event.target;
         if (event.target.tagName === "SPAN") target = event.target.parentElement;
         console.log(target.dataset.index);
         const selectedSlice = slices[target.dataset.index];
         console.log(selectedSlice);
-        if (selectedSlice !== undefined) highlightSlice(target, selectedSlice);
-    });
+        if (selectedSlice !== undefined) {
+            deselectAll();
 
-    function highlightSlice(component, slice) {
-        const sliceColor = component.querySelector(".slice-color").style.backgroundColor;
-        node.attr("fill", d => slice.nodes.includes(d.id) ? sliceColor : d.type === "Host" ? HOST_COLOR : SWITCH_COLOR);
-        link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa").attr("stroke-width", 2);
-    }
+            target.classList.toggle("selected");
+            highlightSlice(target, selectedSlice);
+
+            await fetchMenuDetails(`/gui/menu/details/slice/${selectedSlice.name}`);
+        }
+    });
 }
 
 /* ----------------------- Cookie helper ----------------------- */
