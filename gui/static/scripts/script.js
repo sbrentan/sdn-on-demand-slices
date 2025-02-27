@@ -3,8 +3,9 @@ const GUI_BASE_URL = 'http://localhost:8086/gui/';
 
 /* ---------------------- Global variable ---------------------- */
 
-const OUTLINE_COLOR = "#FF6347"; 
-const NODE_SIZE = 35;    
+const OUTLINE_COLOR = "#FF6347";
+const LINK_COLOR = "#aaa";
+const NODE_SIZE = 35;
 
 var graph_data = undefined;
 var ratio = 1.25;
@@ -86,12 +87,12 @@ function highlightSlice(component, slice) {
     node.attr("filter", d => slice.nodes.includes(d.id) ? "url(#outlineFilter)" : null);
 
     // line stroke 4 if link is in slice, else 2
-    link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa").attr("stroke-width", d => slice.links.includes(d.id) ? 4 : 2);
+    link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : LINK_COLOR).attr("stroke-width", d => slice.links.includes(d.id) ? 4 : 2);
 }
 
 function deselectAll() {
     d3.selectAll("image").attr("filter", null);
-    d3.selectAll("line").attr("stroke", "#aaa").attr("stroke-width", 2);
+    d3.selectAll("line").attr("stroke", LINK_COLOR).attr("stroke-width", 2);
 
 
     // remove selection from all slices
@@ -165,14 +166,14 @@ function renderGraph(data, slices) {
         .data(data.links)
         .enter()
         .append("line")
-        .attr("stroke", "#aaa")
+        .attr("stroke", LINK_COLOR)
         .attr("stroke-width", 2)
         .attr("cursor", "pointer")
         .on("mouseover", function() {
             d3.select(this).attr("stroke-width", 4);
         })
         .on("mouseout", function() {
-            if (d3.select(this).attr("stroke") !== OUTLINE_COLOR) {
+            if (d3.select(this).attr("stroke") === LINK_COLOR) {
                 d3.select(this).attr("stroke-width", 2);
             }
         })

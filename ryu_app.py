@@ -20,6 +20,10 @@ from utils.constants import CONTROLLER_INSTANCE_NAME, SWITCHES, HOSTS, FlowPrior
 logging.basicConfig(level=logging.DEBUG)
 
 
+S = ["s1", "s2", "s3", "s4"]
+H = ["h00:00:00:00:00:01", "h00:00:00:00:00:02", "h00:00:00:00:00:03", "h00:00:00:00:00:04"]
+
+
 class DynamicSlicingController(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     _CONTEXTS = {
@@ -45,7 +49,7 @@ class DynamicSlicingController(app_manager.RyuApp):
         # TODO: Load the configuration of the network from get_all_switch/get_all_link (handle also topology changes)
 
         self.slices: List[Slice] = [
-            Slice(name="slice1", switches=["s1", "s2", "s4"], hosts=["h1", "h3"], min_rate=9000000, max_rate=9000000, rules={
+            Slice(name="slice1", switches=[S[0], S[1], S[3]], hosts=[H[0], H[2]], min_rate=9000000, max_rate=9000000, rules={
                 "allowed_services": {
                     "10.0.0.3": [9999, 9998],
                 },
@@ -54,7 +58,7 @@ class DynamicSlicingController(app_manager.RyuApp):
             # Slice(name="slice2", switches=["s1", "s3", "s4"], hosts=["h2", "h4"], bandwidth=1000, rules={
             #     "allowed_protocols": [Protocol.TCP.value],
             # }),
-            Slice(name="slice3", switches=["s1", "s3", "s4"], hosts=["h1", "h2", "h3", "h4"], min_rate=1000, max_rate=1000, rules={
+            Slice(name="slice3", switches=[S[0], S[2], S[3]], hosts=[H[0], H[1], H[2], H[3]], min_rate=1000, max_rate=1000, rules={
                 "allowed_protocols": [Protocol.ICMP.value],
             }),
         ]

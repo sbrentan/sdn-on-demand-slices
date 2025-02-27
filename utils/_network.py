@@ -16,17 +16,6 @@ class NodeType(Enum):
 
     HOST = "Host"
     SWITCH = "Switch"
-
-    @staticmethod
-    def from_node_id(node_id: str) -> NodeType:
-        # return NodeType.HOST
-        logging.info("From node id: %s", node_id)
-        if node_id.startswith("h"):
-            return NodeType.HOST
-        elif node_id.startswith("s"):
-            return NodeType.SWITCH
-        else:
-            raise ValueError(f"Unknown node type for node_id: {node_id}")
         
     def __str__(self):
         return self.value
@@ -41,14 +30,27 @@ class Node:
     node_type: NodeType
     node_id: str
     node_ref: Switch | Host
+    name: Optional[str] = None
+
+    def __post_init__(self):
+        if self.node_type == NodeType.HOST and not isinstance(self.node_ref, Host):
+            raise ValueError("Invalid node reference for host")
+        if self.node_type == NodeType.SWITCH and not isinstance(self.node_ref, Switch):
+            raise ValueError("Invalid node reference for switch")
+        if not self.name:
+            self.name = f"{self.node_type} {self.node_id}"
+
+    @property
+    def ref_id(self) -> str:
+        return self.get_node_id(self.node_ref)
 
     @staticmethod
     def get_switch_id(datapath_id: int) -> str:
-        return f"s{datapath_id}"
-    
+        return "s" + str(datapath_id)
+
     @staticmethod
     def get_host_id(mac: str) -> str:
-        return "h" + str(int(mac.replace(":", ""), 16))
+        return "h" + mac
 
     @staticmethod
     def get_node_id(node_ref: Switch | Host) -> str:
@@ -56,7 +58,7 @@ class Node:
             return Node.get_switch_id(node_ref.dp.id)
         elif isinstance(node_ref, Host):
             return Node.get_host_id(node_ref.mac)
-        raise ValueError(f"Unknown node type for node_ref: {node_ref}")
+        raise ValueError(f"Unknown node type: {node_ref}")
 
     def __repr__(self) -> str:
         return f"{self.node_type.value}({self.node_id})"
@@ -83,17 +85,6 @@ class Connection:
         if self.dst[1].node_type == NodeType.HOST:
             raise ValueError("Destination node cannot be a host")
 
-    @staticmethod
-    def get_link_id(connection: Connection | Link) -> str:
-        if isinstance(connection, Connection):
-            node_ids = [connection.dst[1].node_id, connection.src[1].node_id]
-        elif isinstance(connection, Link):
-            node_ids = [Node.get_switch_id(connection.dst.dpid), Node.get_switch_id(connection.src.dpid)]
-        else:
-            raise ValueError("Unknown connection type")
-        node_ids.sort()
-        return "-".join(node_ids)
-
     @property
     def link_id(self) -> str:
         return self.get_link_id(self)
@@ -107,6 +98,17 @@ class Connection:
         if not self.src or not self.src[1] or not isinstance(self.src[1].node_ref, Host):
             raise ValueError("Invalid source node for host connection")
         return self.src[1].node_ref.mac
+
+    @staticmethod
+    def get_link_id(connection: Connection | Link) -> str:
+        if isinstance(connection, Connection):
+            node_ids = [connection.dst[1].node_id, connection.src[1].node_id]
+        elif isinstance(connection, Link):
+            node_ids = [Node.get_switch_id(connection.dst.dpid), Node.get_switch_id(connection.src.dpid)]
+        else:
+            raise ValueError("Unknown connection type")
+        node_ids.sort()
+        return "-".join(node_ids)
 
     def get_queue_for_slice(self, slice: Any) -> Any:  # Cannot define type of slice as it is a circular import
         for queue in self.queues:
