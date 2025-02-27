@@ -1,4 +1,5 @@
 import logging, os, httpx, json
+from typing import Dict
 
 from jinja2 import Environment, FileSystemLoader
 from webob import Response
@@ -9,7 +10,7 @@ from controllers.utils.dict_object import DictObject
 from controllers.utils.paths import ApiPaths, GuiPaths
 from utils.constants import GUI_BASE_URL, CONTROLLER_IP, CONTROLLER_PORT, STATIC_DIR, TEMPLATE_DIR
 
-STATIC_DIR =  os.path.join(os.path.dirname(os.path.dirname(__file__)), STATIC_DIR)
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), STATIC_DIR)
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), TEMPLATE_DIR)
 
 
@@ -40,10 +41,12 @@ class GUIController(ControllerBase):
             logging.error(f"Error while trying to fetch data from {url}: {e}")
             return 500, None
 
-    def render_template(self, template_name, context={}):
+    def render_template(self, template_name, context: Dict = None):
         """Renders a Jinja2 template with the given context."""
         template_name = f"{template_name}.html"
         template = self.jinja_env.get_template(template_name)
+        if context is None:
+            context = {}
         context.update({
             "base_url": GUI_BASE_URL,
             "Paths": GuiPaths,
@@ -69,40 +72,26 @@ class GUIController(ControllerBase):
     @route('switch_details', GuiPaths.SWITCH_DETAILS(), methods=['GET'])
     def switch_details(self, req, switch_id, **kwargs):
         """REST endpoint to serve the details of a specific switch."""
-
         status, switch = self.get_data(ApiPaths.SWITCH(switch_id))
-        
         if status != 200:
             return Response(status=status, body=f"Error while trying to fetch switch data: {switch}")
-        
-        # return Response(status=200, body=f"Switch details: {switch}")
-
-        context = {
-            "switch": DictObject(**switch)
-        }
-
+        context = {"switch": DictObject(**switch)}
         return self.render_template(f"details/switch", context)
     
     @route('host_details', GuiPaths.HOST_DETAILS(), methods=['GET'])
-    def host_details(self, req, **kwargs):
+    def host_details(self, req, host_id, **kwargs):
         """REST endpoint to serve the details of a specific host."""
-
-        context = {
-            "host": {
-                "name": 'Host 1',
-            }
-        }
-
+        status, host = self.get_data(ApiPaths.HOST(host_id))
+        if status != 200:
+            return Response(status=status, body=f"Error while trying to fetch host data: {host}")
+        context = {"host": DictObject(**host)}
         return self.render_template(f"details/host", context)
     
     @route('slice_details', GuiPaths.SLICE_DETAILS(), methods=['GET'])
-    def slice_details(self, req, **kwargs):
+    def slice_details(self, req, slice_id, **kwargs):
         """REST endpoint to serve the details of a specific slice."""
-
-        context = {
-            "slice": DictObject({
-                "name": 'Slice 1',
-            })
-        }
-
+        status, slice = self.get_data(ApiPaths.SLICE(slice_id))
+        if status != 200:
+            return Response(status=status, body=f"Error while trying to fetch slice data: {slice}")
+        context = {"slice": DictObject(**slice)}
         return self.render_template(f"details/slice", context)

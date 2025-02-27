@@ -75,6 +75,25 @@ async function fetchMenuDetails (url) {
     }
 }
 
+function highlightSlice(component, slice) {
+    const sliceColor = component.querySelector(".slice-color").style.backgroundColor;
+    let node = d3.selectAll("circle");
+    let link = d3.selectAll("line");
+    node.attr("fill", d => slice.nodes.includes(d.id) ? sliceColor : d.type === "Host" ? HOST_COLOR : SWITCH_COLOR);
+    link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa").attr("stroke-width", 2);
+}
+
+function deselectAll() {
+    d3.selectAll("circle").attr("stroke", "none");
+    d3.selectAll("line").attr("stroke", "#aaa").attr("stroke-width", 2);
+
+
+    // remove selection from all slices
+    const sliceList = document.getElementById("slice-list");
+    highlightSlice(sliceList, { nodes: [], links: [] });
+    const slices = sliceList.querySelectorAll(".list-group-item");
+    slices.forEach(slice => slice.classList.remove("selected"));
+}
 
 function renderGraph(data, slices) {
     
@@ -85,8 +104,8 @@ function renderGraph(data, slices) {
         .attr("viewBox", `0 0 ${width} ${height}`)
         .on("click", () => {
             // Remove all outlines
-            d3.selectAll("circle").attr("stroke", "none");
-            d3.selectAll("line").attr("stroke", "#aaa").attr("stroke-width", 2);
+            // d3.selectAll("circle").attr("stroke", "none");
+            // d3.selectAll("line").attr("stroke", "#aaa").attr("stroke-width", 2);
         });
 
     const simulation = d3.forceSimulation(data.nodes)
@@ -107,8 +126,7 @@ function renderGraph(data, slices) {
 
             console.log("Clicked link:", d);
 
-            // Remove outline from all circles first
-            d3.selectAll("circle").attr("stroke", "none");
+            deselectAll();
             
             link.attr("stroke", "#aaa").attr("stroke-width", 2);
 
@@ -134,10 +152,8 @@ function renderGraph(data, slices) {
             event.stopPropagation();
 
             console.log("Clicked node:", d);
-    
-            // Remove outline from all circles first
-            node.attr("stroke", "none");
-            link.attr("stroke", "#aaa").attr("stroke-width", 2);
+
+            deselectAll();
     
             // Highlight the clicked circle
             d3.select(this)
@@ -191,20 +207,21 @@ function renderGraph(data, slices) {
     }
 
     const sliceList = document.getElementById("slice-list");
-    sliceList.addEventListener("click", event => {
+    sliceList.addEventListener("click", async function (event) {
         let target = event.target;
         if (event.target.tagName === "SPAN") target = event.target.parentElement;
         console.log(target.dataset.index);
         const selectedSlice = slices[target.dataset.index];
         console.log(selectedSlice);
-        if (selectedSlice !== undefined) highlightSlice(target, selectedSlice);
-    });
+        if (selectedSlice !== undefined) {
+            deselectAll();
 
-    function highlightSlice(component, slice) {
-        const sliceColor = component.querySelector(".slice-color").style.backgroundColor;
-        node.attr("fill", d => slice.nodes.includes(d.id) ? sliceColor : d.type === "Host" ? HOST_COLOR : SWITCH_COLOR);
-        link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : "#aaa").attr("stroke-width", 2);
-    }
+            target.classList.toggle("selected");
+            highlightSlice(target, selectedSlice);
+
+            await fetchMenuDetails(`/gui/menu/details/slice/${selectedSlice.name}`);
+        }
+    });
 }
 
 /* ----------------------- Cookie helper ----------------------- */

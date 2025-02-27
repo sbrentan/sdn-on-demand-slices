@@ -66,6 +66,13 @@ body {
     background-color: #e0f7fa;
 }
 
+#slice-list li.selected {
+    background-color: #b3e5fc;
+}
+#slice-list li.selected span {
+    color: #000 !important;
+}
+
 #graph-container {
     flex: 1;
     overflow: hidden;
