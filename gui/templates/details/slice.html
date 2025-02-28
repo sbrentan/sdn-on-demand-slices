@@ -1,10 +1,81 @@
-<h3>Slice</h3>
-<hr>
-<div class="row">
-    <div class="col-md-12">
-        <div class="form-group">
-            <label for="slice_name">Slice Name</label>
-            <input type="text" class="form-control" id="slice_name" value="{{ slice.name }}" readonly>
+<div class="container my-4">
+    <h3>Slice Details</h3>
+    <hr>
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="form-group">
+                <label for="slice_name" class="form-label">Name</label>
+                <input type="text" class="form-control" id="slice_name" value="{{ slice.name }}" readonly>
+                <label for="slice_status" class="form-label">Status</label>
+                <input type="text" class="form-control" id="slice_status" value="{{ 'Enabled' if slice.active else 'Disabled' }}" readonly>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="min_rate" class="form-label">Min Rate</label>
+                            <input type="text" class="form-control" id="min_rate" value="{{ slice.min_rate }}" readonly>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="max_rate" class="form-label">Max Rate</label>
+                            <input type="text" class="form-control" id="max_rate" value="{{ slice.max_rate }}" readonly>
+                        </div>
+                    </div>
+                </div>
+                {% if slice.rules.allowed_protocols %}
+                <label for="allowed_protocols" class="form-label">Allowed Protocols</label>
+                <ul>
+                    {% for protocol in slice.rules.allowed_protocols %}
+                        <li>{{ protocol }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% if slice.rules.allowed_services %}
+                    <label for="allowed_services" class="form-label">Allowed Services</label>
+                    <ul class="list-group">
+                        {% for ip, ports in slice.rules.allowed_services.items() %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center p-1">
+                                <mark>{{ ip }}</mark>
+                                <div>
+                                    {% for port in ports %}
+                                        <span class="badge bg-info">{{ port }}</span>
+                                    {% endfor %}
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if slice.rules.allowed_ports %}
+                    <label for="allowed_ports" class="form-label">Allowed Ports</label>
+                    <ul>
+                        {% for port in slice.rules.allowed_ports %}
+                            <li><mark>{{ port }}</mark></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <h5>Actions</h5>
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <button type="button" class="btn btn-primary w-100" title="Edit">Edit <i class="bi bi-pencil-fill"></i></button>
+                </div>
+                <div class="col-md-6">
+                    <button type="button" class="btn btn-danger w-100" title="Delete">Delete <i class="bi bi-trash-fill"></i></button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <button type="button" class="btn btn-success w-100" title="Enable">Enable <i class="bi bi-unlock-fill"></i></button>
+                </div>
+                <div class="col-md-6">
+                    <button type="button" class="btn btn-warning w-100 text-white" title="Disable">Disable <i class="bi bi-lock-fill"></i></button>
+                </div>
+            </div>
         </div>
     </div>
 </div>

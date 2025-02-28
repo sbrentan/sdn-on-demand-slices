@@ -1,12 +1,22 @@
-<h3>Switch Details</h3>
-<hr>
-<div class="row">
-    <div class="col-md-12">
-        <div class="form-group">
-            <label for="switch_name">Name:</label>
-            <input type="text" class="form-control" id="switch_name" value="{{ switch.id }}" readonly>
-            <label for="switch_dpid">DPID:</label>
-            <input type="text" class="form-control" id="switch_dpid" value="{{ switch.dpid }}" readonly>
+<div class="container my-4">
+    <h3>Switch Details</h3>
+    <hr>
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="form-group">
+                <label for="switch_name" class="form-label">Name</label>
+                <input type="text" class="form-control" id="switch_name" value="{{ switch.id }}" readonly>
+                <label for="switch_dpid" class="form-label">Datapath ID</label>
+                <input type="text" class="form-control" id="switch_dpid" value="{{ switch.dpid }}" readonly>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <h5>Actions</h5>
+            <button type="button" class="btn btn-primary" title="Edit">Edit <i class="bi bi-pencil-fill"></i></button>
+            <button type="button" class="btn btn-danger" title="Delete">Delete <i class="bi bi-trash-fill"></i></button>
         </div>
     </div>
 </div>

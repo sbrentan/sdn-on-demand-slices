@@ -107,7 +107,7 @@ body {
     display: flex;
     flex-direction: row;
     transition: width 0.3s ease;
-    background-color: #d9d5d5;
+    background-color: #f4f4f4;
     border-radius: 5px 0 0 5px;
 }
 #details-menu .close-menu-btn {
@@ -140,7 +140,12 @@ body {
     width: 0px;
 }
 #details-menu.opened {
-    width: 300px;
+    width: 400px;
+    overflow: auto;
+}
+
+#details-menu label {
+    font-weight: bold;
 }
 
 #details-menu .details-container {

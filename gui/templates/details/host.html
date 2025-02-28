@@ -1,10 +1,24 @@
-<h3>Host Details</h3>
-<hr>
-<div class="row">
-    <div class="col-md-12">
-        <div class="form-group">
-            <label for="host_name">Name:</label>
-            <input type="text" class="form-control" id="host_name" value="{{ host.id }}" readonly>
+<div class="container my-4">
+    <h3>Host Details</h3>
+    <hr>
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="form-group mb-3">
+                <label for="host_name" class="form-label">Name</label>
+                <input type="text" class="form-control" id="host_name" value="{{ host.id }}" readonly>
+                <label for="host_mac" class="form-label">MAC Address</label>
+                <input type="text" class="form-control" id="host_mac" value="{{ host.mac }}" readonly>
+                <label for="host_ip" class="form-label">IPv4 Address</label>
+                <input type="text" class="form-control" id="host_ip" value="{{ host.ip[0] }}" readonly>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <h5>Actions</h5>
+            <button type="button" class="btn btn-primary" title="Edit">Edit <i class="bi bi-pencil-fill"></i></button>
+            <button type="button" class="btn btn-danger" title="Delete">Delete <i class="bi bi-trash-fill"></i></button>
         </div>
     </div>
 </div>

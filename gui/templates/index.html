@@ -20,14 +20,7 @@
     <body>
         <h1 id="title" class="display-5 text-center my-4">SDN On-Demand Slices</h1>
         <div class="d-flex justify-content-center mt-3 mb-3">
-            <button type="button"
-                id="fetch-component" 
-                class="btn btn-light mx-2"
-                hx-target="#details-container"
-                hx-get="{{ Paths.SWITCH_DETAILS('s1') }}"
-                hx-swap="innerHTML"
-            >Fetch Component</button>
-
+            <button type="button" class="btn btn-light mx-2">Add Slice</button>
             <button type="button" class="btn btn-light mx-2">Action 2</button>
             <button type="button" class="btn btn-light mx-2">Action 3</button>
         </div>
@@ -57,13 +50,6 @@
 </html>
 
 <script>
-    button = document.querySelector('#fetch-component');
-    button.addEventListener('htmx:beforeRequest', function(event) {
-        let menu = document.querySelector('#details-menu');
-        menu.classList.add('opened');
-        menu.classList.remove('closed');
-    });
-
     close_button = document.querySelector('.close-menu-btn');
     close_button.addEventListener('click', function(event) {
         deselectAll();

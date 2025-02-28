@@ -303,14 +303,14 @@ function resetZoom() {
 }
 
 function saveLayout() {
-    if (data !== undefined) {
-        const layout = data.nodes.map(node => ({
+    if (graph_data !== undefined) {
+        const layout = graph_data.nodes.map(node => ({
             id: node.id,
             type: node.type,
             x: node.x,
             y: node.y
         }));
-        const links = data.links.map(link => ({
+        const links = graph_data.links.map(link => ({
             id: link.id,
             source: link.source.id,
             target: link.target.id
