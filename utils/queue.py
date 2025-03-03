@@ -10,7 +10,6 @@ from utils.topology import Connection, Switch, Network, Node, TopologyUtils
 from utils.slice import Slice
 from utils.constants import CONTROLLER_IP, CONTROLLER_PORT, OVSDB_ADDR, NETWORK_MAX_RATE
 
-
 @dataclass
 class Queue:
 
@@ -183,7 +182,7 @@ class QueueUtils:
         logging.info(f"Setting OVSDB address for switch {dpid}: {response.status_code} {response.text}")
 
     @staticmethod
-    def create_queues(dpid, port_name, queues: List[Queue]) -> Tuple:
+    def create_queues(dpid, port_name, queues: List[Queue], max_retries: int = 5) -> Tuple:
 
         dpid_str = dpid_lib.dpid_to_str(dpid)
         url = f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}/qos/queue/{dpid_str}"
@@ -198,19 +197,18 @@ class QueueUtils:
         
         logging.info(f"URL: {url}, Data: {json.dumps(data, indent=4)}")
 
-        for i in range(3):
-            if i > 0:
-                logging.info(f"Retrying to create queues for switch {dpid} port {port_name} (attempt {i + 1})")
-                time.sleep(2 * i)
+        for i in range(max_retries):            
             try:
+
                 response = httpx.request(
                     method="POST",
                     url=url,
                     data=json.dumps(data),  # type: ignore
-                    timeout=10.0
+                    timeout=10
                 )
-                response_status = response.status_code  # Get the status code of the response
-                response_data = json.loads(response.text)  # Read and decode the response
+
+                response_status = response.status_code
+                response_data = json.loads(response.text) 
                 logging.info(f"Response: {response_status} {response_data}")
 
                 if response_status == 200 and response_data[0]['command_result']['result'] == 'success':
@@ -220,6 +218,9 @@ class QueueUtils:
 
             except Exception as e:
                 logging.error(f"Exception {e}")
+                time.sleep(2 * (i+1))
+                logging.info(f"Retrying to create queues for switch {dpid} port {port_name} (attempt {i + 1})")
+        
         return None, ""
 
     def delete_queues(self, dpid, port_name) -> Tuple:

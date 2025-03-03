@@ -2,7 +2,7 @@ import json, logging
 from typing import Dict, List, Tuple, Optional
 
 from ryu.base import app_manager
-from ryu.topology import switches, event
+from ryu.topology import switches
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
@@ -10,21 +10,22 @@ from ryu.lib.packet.packet import Packet
 from ryu.lib.packet import packet, ethernet, ether_types
 from ryu.app.wsgi import WSGIApplication
 
+from handlers.topology_events import TopologyEventHandler
+from handlers.network_update import NetworkHandler
 from controllers.api import APIController
 from controllers.gui import GUIController
-from utils.topology import TopologyUtils, Connection, Node
+from utils.topology import Node, Connection
 from utils.slice import Protocol, Slice, SliceUtils
 from utils.queue import Queue, QueueUtils
-from utils.constants import CONTROLLER_INSTANCE_NAME, SWITCHES, HOSTS, FlowPriority
+from utils.constants import CONTROLLER_INSTANCE_NAME, FlowPriority
 
 logging.basicConfig(level=logging.DEBUG)
-
 
 S = ["s1", "s2", "s3", "s4"]
 H = ["h00:00:00:00:00:01", "h00:00:00:00:00:02", "h00:00:00:00:00:03", "h00:00:00:00:00:04"]
 
 
-class DynamicSlicingController(app_manager.RyuApp):
+class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     _CONTEXTS = {
         'wsgi': WSGIApplication,
@@ -34,19 +35,16 @@ class DynamicSlicingController(app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         logging.info("Initializing DynamicSlicingController")
         super(DynamicSlicingController, self).__init__(*args, **kwargs)
+        
+        # Increase timeout for OVSDB operations
+        self.CONF.set_override('ovsdb_timeout', 10)
 
         # Register the API and GUI controllers
         wsgi = kwargs['wsgi']
         wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
         wsgi.register(GUIController)
 
-        # self.CONF.set_override('ovsdb_timeout', 3)
-        # self.CONF.set_default('ovsdb_timeout', 3)
-
-        self.connected_hosts = 0
-        self.connected_switches = 0
-
-        # TODO: Load the configuration of the network from get_all_switch/get_all_link (handle also topology changes)
+        # TODO: Load the slices configuration from file
 
         self.slices: List[Slice] = [
             Slice(name="slice1", switches=[S[0], S[1], S[3]], hosts=[H[0], H[2]], min_rate=9000000, max_rate=9000000, rules={
@@ -64,13 +62,13 @@ class DynamicSlicingController(app_manager.RyuApp):
         ]
         logging.info("slices: " + str(self.slices))
 
-        self.network = None
-        self.network_initialized = False
         self.link_to_slice_dict: Dict[str, List[Slice]] = {}
         self.node_connections: Dict[str, List[Connection]] = {}
-
         self.slice_utils = SliceUtils(self.link_to_slice_dict, self.node_connections)
-        self.queue_utils = QueueUtils(self.network, self.link_to_slice_dict, self.node_connections)
+        self.queue_utils = QueueUtils(None, self.link_to_slice_dict, self.node_connections)
+
+        # Initialize the network handler
+        self.network_handler = NetworkHandler(self)
 
         # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
         self.mac_to_port: Dict[str, Dict[str, Dict[str, Tuple[int, int]]]] = {}
@@ -87,6 +85,7 @@ class DynamicSlicingController(app_manager.RyuApp):
         )
         datapath.send_msg(mod)
 
+    # TODO: Use this method to delete flows
     def delete_flow(self, datapath, match):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -112,78 +111,11 @@ class DynamicSlicingController(app_manager.RyuApp):
         )
         datapath.send_msg(out)
 
-    def init_node_connections(self):
-        if not self.network:
-            return
-        self.node_connections = {}
-        for connection in self.network.connections:
-            if connection.src[1].node_id not in self.node_connections:
-                self.node_connections[connection.src[1].node_id] = []
-            if connection.dst[1].node_id not in self.node_connections:
-                self.node_connections[connection.dst[1].node_id] = []
-            self.node_connections[connection.src[1].node_id].append(connection)
-            self.node_connections[connection.dst[1].node_id].append(connection)
-        logging.info("node_connections: " + str(self.node_connections))
-        self.slice_utils.node_connections = self.node_connections
-        self.queue_utils.node_connections = self.node_connections
-
-    def init_slices(self, slices):
-        if not self.network:
-            return
-        self.link_to_slice_dict = {}
-        self.slices = slices
-        for slice in slices:
-            if not slice.active:
-                continue
-            for connection in self.network.connections:
-                connection_id = Connection.get_link_id(connection)
-                if connection_id not in self.link_to_slice_dict:
-                    self.link_to_slice_dict[connection_id] = []
-                if connection.is_host_connection:
-                    if connection.src[1].node_id in slice.hosts:
-                        if slice.name not in [s.name for s in self.link_to_slice_dict[connection_id]]:
-                            self.link_to_slice_dict[connection_id].append(slice)
-                elif connection.src[1].node_id in slice.switches and connection.dst[1].node_id in slice.switches:
-                    if slice.name not in [s.name for s in self.link_to_slice_dict[connection_id]]:
-                        self.link_to_slice_dict[connection_id].append(slice)
-        logging.info("link_to_slice dicts: " + str(self.link_to_slice_dict))
-        self.slice_utils.link_to_slice_dict = self.link_to_slice_dict
-        self.queue_utils.link_to_slice_dict = self.link_to_slice_dict
-        self.queue_utils.network = self.network
-        self.queue_utils.init_queues()
-
-    def init_network(self):
-        if self.connected_hosts == HOSTS and self.connected_switches == SWITCHES:
-            # Initialize the data structures to store the slices
-            logging.info("Updating network...")
-            self.network = TopologyUtils.build_network(self)
-            logging.info("Updated network: " + str(self.network))
-
-            self.init_node_connections()
-
-            for _, switch in TopologyUtils.switches.items():
-
-                # set the ovsdb address
-                QueueUtils.set_ovsdb_address(switch.dp.id)
-
-            self.init_slices(self.slices)  # TODO: change
-
-    @set_ev_cls(event.EventHostAdd)
-    def host_add_handler(self, ev):
-        logging.info("Host connected: %s", Node.get_host_id(ev.host.mac))
-
-        self.connected_hosts += 1
-        self.init_network()
-
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-
-        logging.info("Switch connected: %s", datapath.id)
-        self.connected_switches += 1
-        self.init_network()
 
         # Install the table-miss flow entry
         match = parser.OFPMatch()
@@ -222,7 +154,7 @@ class DynamicSlicingController(app_manager.RyuApp):
 
         in_connection = self.slice_utils.get_in_connection(switch_id, in_port)
         if not in_connection:
-            logging.info("[ERROR] Could not find in_connection for switch %s port %s", switch_id, in_port)
+            logging.error("[ERROR] Could not find in_connection for switch %s port %s", switch_id, in_port)
             return
         logging.info(f"Incoming connection: {in_connection}")
 

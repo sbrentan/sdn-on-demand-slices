@@ -7,7 +7,7 @@ from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.cli import CLI
 from mininet.link import TCLink
 
-from utils.constants import SWITCHES, HOSTS
+from utils.constants import DEBUG
 
 class NetworkSlicingTopology(Topo):
 
@@ -22,12 +22,12 @@ class NetworkSlicingTopology(Topo):
         host_link_config = dict()
 
         # Create switch nodes
-        for i in range(SWITCHES):
+        for i in range(4):
             sconfig = {"dpid": "%016x" % (i + 1)}
             self.addSwitch("s%d" % (i + 1), **sconfig)
 
         # Create host nodes
-        for i in range(HOSTS):
+        for i in range(4):
             self.addHost("h%d" % (i + 1), **host_config)
 
         # Add switch links
@@ -55,10 +55,11 @@ class NetworkSlicingTopology(Topo):
         net.addController(controller)  # type: ignore
         net.build()
         net.start()
-        
-        time.sleep(2)
-
-        net.pingAll()
+        if DEBUG:
+            print("Network started, waiting for queues to be built...")
+            time.sleep(30)
+            print("Trying to ping all hosts...")
+            net.pingAll()
         CLI(net)
         net.stop()
 
