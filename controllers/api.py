@@ -5,6 +5,7 @@ from webob import Response
 from ryu.app.wsgi import ControllerBase, route
 
 from utils.topology import TopologyUtils, Switch, Host, Node
+from utils.slice import Slice
 from utils.constants import CONTROLLER_INSTANCE_NAME
 from controllers.utils.paths import ApiPaths
 
@@ -16,8 +17,10 @@ class APIController(ControllerBase):
         from ryu_app import DynamicSlicingController
         self.controller_instance: DynamicSlicingController = data[CONTROLLER_INSTANCE_NAME]
 
-    def _json_response(self, data: Union[dict, list]) -> Response:
-        return Response(text=json.dumps(data, default=str), content_type='application/json')
+    def _json_response(self, data: Union[dict, list, None] = None, status: str = "200 OK") -> Response:
+        if data:
+            return Response(status=status, text=json.dumps(data, default=str), content_type='application/json')
+        return Response(status=status)
 
     # ====================================== SLICES ====================================== #
 
@@ -33,35 +36,93 @@ class APIController(ControllerBase):
                 slice_links[slice.name].append(connection.link_id)
         for slice in self.controller_instance.slices:
             slice_dict = slice.to_dict()
-            slice_dict['links'] = slice_links[slice.name]
+            slice_dict['links'] = slice_links[slice.name] if slice.name in slice_links else []
             slices_dict.append(slice_dict)
-        return self._json_response(slices_dict)
+        return self._json_response(data=slices_dict)
 
     @route('get_slice', ApiPaths.SLICE(), methods=['GET'])
     def get_slice(self, req, slice_id, **kwargs):
         """REST endpoint to get the details of a specific slice."""
         slice = [s for s in self.controller_instance.slices if s.name == slice_id]
         if not slice:
-            return Response(status="404 Not Found")
+            return self._json_response(status="404 Not Found")
         slice_dict = slice[0].to_dict()
         slice_links = []
         for connection in TopologyUtils.connections:
             if slice[0] in self.controller_instance.link_to_slice_dict[connection.link_id]:
                 slice_links.append(connection.link_id)
         slice_dict['links'] = slice_links
-        return self._json_response(slice_dict)
+        return self._json_response(data=slice_dict)
 
     @route('create_slice', ApiPaths.SLICES(), methods=['POST'])
     def create_slice(self, req, **kwargs):
         """REST endpoint to create a slice."""
+        try:
+            slice_data = json.loads(req.body)
+        except Exception as e:
+            logging.error(f"Error creating slice: {e}")
+            return self._json_response(status="400 Bad Request")
+        if [s for s in self.controller_instance.slices if s.name == slice_data["name"]]:
+            logging.error(f"Error creating slice {slice_data['name']}: already exists")
+            return self._json_response(status="409 Conflict")
+        self.controller_instance.slices.append(Slice.from_dict(slice_data))
+        return self._json_response(status="201 Created")
 
     @route('update_slice', ApiPaths.SLICES(), methods=['PUT'])
     def update_slice(self, req, **kwargs):
         """REST endpoint to update a slice."""
+        try:
+            slice_data = json.loads(req.body)
+            slice_id = slice_data["id"]
+        except Exception as e:
+            logging.error(f"Error updating slice: {e}")
+            return self._json_response(status="400 Bad Request")
+        slice_match = [s for s in self.controller_instance.slices if s.name == slice_id]
+        if not slice_match:
+            logging.error(f"Error updating slice {slice_data['name']}: not found")
+            return self._json_response(status="404 Not Found")
+        slice_match[0].update_from_dict(slice_data)
+        return self._json_response(status="200 OK", data=slice_match[0].to_dict())
 
     @route('delete_slice', ApiPaths.SLICES(), methods=['DELETE'])
     def delete_slice(self, req, **kwargs):
         """REST endpoint to delete a slice."""
+        try:
+            slice_id = json.loads(req.body)["id"]
+        except Exception as e:
+            logging.error(f"Error deleting slice: {e}")
+            return self._json_response(status="400 Bad Request")
+        slice_match = [s for s in self.controller_instance.slices if s.name == slice_id]
+        if not slice_match:
+            logging.error(f"Error deleting slice {slice_id}: not found")
+            return self._json_response(status="404 Not Found")
+        self.controller_instance.slices.remove(slice_match[0])
+        return self._json_response(status="204 No Content")
+
+    @route('activate_slice', ApiPaths.ACTIVATE_SLICE(), methods=['GET'])
+    def activate_slice(self, req, slice_id, **kwargs):
+        """REST endpoint to activate a slice."""
+        slice_match = [s for s in self.controller_instance.slices if s.name == slice_id]
+        if not slice_match:
+            logging.error(f"Error activating slice {slice_id}: not found")
+            return self._json_response(status="404 Not Found")
+        slice = slice_match[0]
+        slice.activate()
+        # TODO: implement slice activation (enable QoS queues on switches)
+        return self._json_response(status="200 OK")
+
+    @route('deactivate_slice', ApiPaths.DEACTIVATE_SLICE(), methods=['GET'])
+    def deactivate_slice(self, req, slice_id, **kwargs):
+        """REST endpoint to deactivate a slice."""
+        slice_match = [s for s in self.controller_instance.slices if s.name == slice_id]
+        if not slice_match:
+            logging.error(f"Error deactivating slice {slice_id}: not found")
+            return self._json_response(status="404 Not Found")
+        slice = slice_match[0]
+        slice.deactivate()
+        # TODO: implement slice deactivation (disable QoS queues on switches)
+        return self._json_response(status="200 OK")
+
 
     # ====================================== TOPOLOGY ====================================== #
 
@@ -82,7 +143,7 @@ class APIController(ControllerBase):
                 node_dict["ip"] = host.ipv4
                 node_dict["mac"] = host.mac
             nodes.append(node_dict)
-        return self._json_response(nodes)
+        return self._json_response(data=nodes)
 
     @route('get_switches', ApiPaths.SWITCHES(), methods=['GET'])
     def get_switches(self, req, **kwargs):
@@ -93,13 +154,13 @@ class APIController(ControllerBase):
                 "id": switch_id,
                 "dpid": switch.dp.id
             })
-        return self._json_response(switches)    
+        return self._json_response(data=switches)    
     
     @route('get_switch', ApiPaths.SWITCH(), methods=['GET'])
     def get_switch(self, req, switch_id, **kwargs):
         """REST endpoint to get the details of a specific switch."""
         switch = TopologyUtils.switches[switch_id]
-        return self._json_response({
+        return self._json_response(data={
             "id": switch_id,
             "dpid": switch.dp.id
         })
@@ -114,13 +175,13 @@ class APIController(ControllerBase):
                 "ip": host.ipv4,
                 "mac": host.mac
             })
-        return self._json_response(hosts)
+        return self._json_response(data=hosts)
     
     @route('get_host', ApiPaths.HOST(), methods=['GET'])
     def get_host(self, req, host_id, **kwargs):
         """REST endpoint to get the details of a specific host."""
         host = TopologyUtils.hosts[host_id]
-        return self._json_response({
+        return self._json_response(data={
             "id": host_id,
             "ip": host.ipv4,
             "mac": host.mac
@@ -136,4 +197,4 @@ class APIController(ControllerBase):
                 "source": connection.src[1].node_id,
                 "target": connection.dst[1].node_id
             })
-        return self._json_response(links)
+        return self._json_response(data=links)

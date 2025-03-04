@@ -12,12 +12,13 @@ from ryu.app.wsgi import WSGIApplication
 
 from handlers.topology_events import TopologyEventHandler
 from handlers.network_update import NetworkHandler
+from handlers.slice_update import SliceHandler
 from controllers.api import APIController
 from controllers.gui import GUIController
 from utils.topology import Node, Connection
 from utils.slice import Protocol, Slice, SliceUtils
 from utils.queue import Queue, QueueUtils
-from utils.constants import CONTROLLER_INSTANCE_NAME, FlowPriority
+from utils.constants import CONTROLLER_INSTANCE_NAME, OVSDB_TIMEOUT, FlowPriority
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -37,15 +38,17 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         super(DynamicSlicingController, self).__init__(*args, **kwargs)
         
         # Increase timeout for OVSDB operations
-        self.CONF.set_override('ovsdb_timeout', 10)
+        self.CONF.set_override('ovsdb_timeout', OVSDB_TIMEOUT)
 
         # Register the API and GUI controllers
         wsgi = kwargs['wsgi']
         wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
         wsgi.register(GUIController)
 
-        # TODO: Load the slices configuration from file
+        # TODO: Complete the slice handler
+        self.slice_handler = SliceHandler(self)
 
+        # TODO: move inside the slice handler?
         self.slices: List[Slice] = [
             Slice(name="slice1", switches=[S[0], S[1], S[3]], hosts=[H[0], H[2]], min_rate=9000000, max_rate=9000000, rules={
                 "allowed_services": {

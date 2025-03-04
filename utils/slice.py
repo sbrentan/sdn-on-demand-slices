@@ -157,6 +157,36 @@ class Slice:
             "max_rate": self.max_rate
         }
     
+    def update_from_dict(self, data: dict):
+        # TODO: is slice.name the actual slice id? or should slice_id be introduced?
+        self.rules = data["rules"] if "rules" in data else self.rules
+        self.switches = [n for n in data["nodes"] if n.startswith("s")] if "nodes" in data else self.switches # TODO: change
+        self.hosts = [n for n in data["nodes"] if n.startswith("h")] if "nodes" in data else self.hosts # TODO: change
+        self.active = bool(data["active"]) if "active" in data else self.active,
+        self.min_rate = data["min_rate"] if "min_rate" in data else self.min_rate
+        self.max_rate = data["max_rate"] if "max_rate" in data else self.max_rate 
+        # TODO: call self.__post_init__() to validate rules??    
+
+    def activate(self):
+        logging.info(f"Activating slice {self.name}")
+        self.active = True
+    
+    def deactivate(self):
+        logging.info(f"Deactivating slice {self.name}")
+        self.active = False
+
+    @staticmethod
+    def from_dict(data: dict) -> Slice:
+        return Slice(
+            name=data["name"],
+            rules=data["rules"],
+            switches=[n for n in data["nodes"] if n.startswith("s")], # TODO: change
+            hosts=[n for n in data["nodes"] if n.startswith("h")], # TODO: change
+            active=bool(data["active"]) if "active" in data else False,
+            min_rate=data.get("min_rate"),
+            max_rate=data.get("max_rate")
+        )
+    
     def __repr__(self) -> str:
         return f"Slice({self.name}) - Switches: {self.switches} - Hosts: {self.hosts}"
     

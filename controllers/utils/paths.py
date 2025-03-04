@@ -31,6 +31,8 @@ class Paths:
 class ApiPaths(Paths, BASE_URL=API_BASE_URL):
     SLICES = '/slices'
     SLICE = '/slices/{slice_id}'
+    ACTIVATE_SLICE = '/slices/{slice_id}/activate'
+    DEACTIVATE_SLICE = '/slices/{slice_id}/deactivate'
     TOPOLOGY = '/topology'
     NODES = '/topology/nodes'
     SWITCHES = '/topology/switches'
