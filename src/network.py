@@ -7,7 +7,7 @@ from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.cli import CLI
 from mininet.link import TCLink
 
-from utils.constants import DEBUG
+from common.constants import DEBUG
 
 class NetworkSlicingTopology(Topo):
 

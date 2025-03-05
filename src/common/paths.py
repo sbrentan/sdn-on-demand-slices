@@ -1,7 +1,7 @@
 import re
 import logging
 
-from utils.constants import API_BASE_URL, GUI_BASE_URL
+from .constants import API_BASE_URL, GUI_BASE_URL
 
 class Paths:
 

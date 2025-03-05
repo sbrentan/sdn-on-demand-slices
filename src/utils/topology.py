@@ -1,20 +1,14 @@
 import logging
-from typing import Dict, List
+from typing import Dict
 
 from ryu.base.app_manager import RyuApp
 from ryu.topology.api import get_all_switch, get_all_link, get_all_host
 from ryu.topology.switches import Switch, Link, Host
 
-from utils._network import Network, Node, NodeType, Connection
+from common import Network, Node, NodeType, Connection
 
 
 class TopologyUtils:
-
-    switches: Dict[str, Switch] = {}
-    links: Dict[str, Link] = {}
-    hosts: Dict[str, Host] = {}
-    nodes: Dict[str, Node] = {}
-    connections: List[Connection]
 
     @staticmethod
     def get_all_switches(app: RyuApp) -> Dict[str, Switch]:
@@ -31,14 +25,6 @@ class TopologyUtils:
     def get_all_hosts(app: RyuApp) -> Dict[str, Host]:
         # logging.info("Hosts: %s", [vars(s) for s in get_all_host(app)])
         return {Node.get_host_id(h.mac): h for h in get_all_host(app)}
-
-    @staticmethod
-    def get_topology_dict():
-        return {
-            "switches": {k: v.to_dict() for k, v in TopologyUtils.switches.items()},
-            "links": {k: v.to_dict() for k, v in TopologyUtils.links.items()},
-            "hosts": {k: v.to_dict() for k, v in TopologyUtils.hosts.items()}
-        }
 
     @staticmethod
     def build_network(app: RyuApp) -> Network:
@@ -107,11 +93,12 @@ class TopologyUtils:
                 link_ref=None,  # no link exists between host and switch
                 queues=[]
             ))
-
-        TopologyUtils.switches = switches
-        TopologyUtils.links = links
-        TopologyUtils.hosts = hosts
-        TopologyUtils.nodes = nodes
-        TopologyUtils.connections = connections
         
-        return Network(connections=connections)
+        # While this is not returned, as it is implemented as a Singleton, it is stored in the class
+        Network(
+            switches=switches,
+            links=links,
+            hosts=hosts,
+            connections=connections,
+            nodes=nodes
+        )

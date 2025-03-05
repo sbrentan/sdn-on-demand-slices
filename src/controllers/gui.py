@@ -6,9 +6,8 @@ from webob import Response
 from webob.static import DirectoryApp
 from ryu.app.wsgi import ControllerBase, route
 
-from controllers.utils.dict_object import DictObject
-from controllers.utils.paths import ApiPaths, GuiPaths
-from utils.constants import GUI_BASE_URL, CONTROLLER_IP, CONTROLLER_PORT, STATIC_DIR, TEMPLATE_DIR
+from common import ApiPaths, GuiPaths, DictObject
+from common.constants import GUI_BASE_URL, CONTROLLER_IP, CONTROLLER_PORT, STATIC_DIR, TEMPLATE_DIR
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), STATIC_DIR)
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), TEMPLATE_DIR)

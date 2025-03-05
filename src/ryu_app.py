@@ -1,4 +1,5 @@
-import json, logging
+import json
+import logging
 from typing import Dict, List, Tuple, Optional
 
 from ryu.base import app_manager
@@ -10,20 +11,14 @@ from ryu.lib.packet.packet import Packet
 from ryu.lib.packet import packet, ethernet, ether_types
 from ryu.app.wsgi import WSGIApplication
 
-from handlers.topology_events import TopologyEventHandler
-from handlers.network_update import NetworkHandler
-from handlers.slice_update import SliceHandler
-from controllers.api import APIController
-from controllers.gui import GUIController
-from utils.topology import Node, Connection
-from utils.slice import Protocol, Slice, SliceUtils
-from utils.queue import Queue, QueueUtils
-from utils.constants import CONTROLLER_INSTANCE_NAME, OVSDB_TIMEOUT, FlowPriority
+from events.topology import TopologyEventHandler
+from managers import NetworkManager, SlicesManager
+from controllers import APIController, GUIController
+from utils import SliceUtils, QueueUtils, TopologyUtils
+from common import Network, Node, Slice, Protocol, Queue 
+from common.constants import CONTROLLER_INSTANCE_NAME, OVSDB_TIMEOUT, FlowPriority
 
 logging.basicConfig(level=logging.DEBUG)
-
-S = ["s1", "s2", "s3", "s4"]
-H = ["h00:00:00:00:00:01", "h00:00:00:00:00:02", "h00:00:00:00:00:03", "h00:00:00:00:00:04"]
 
 
 class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
@@ -33,11 +28,16 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         'switches': switches.Switches
     }
 
+    slices_manager: SlicesManager
+    network_manager: NetworkManager
+
+    mac_to_port: Dict[str, Dict[str, Dict[str, Tuple[int, int]]]]
+
     def __init__(self, *args, **kwargs):
         logging.info("Initializing DynamicSlicingController")
         super(DynamicSlicingController, self).__init__(*args, **kwargs)
         
-        # Increase timeout for OVSDB operations
+        # Increase timeout for OVSDB operations  TODO: remove?
         self.CONF.set_override('ovsdb_timeout', OVSDB_TIMEOUT)
 
         # Register the API and GUI controllers
@@ -45,36 +45,16 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
         wsgi.register(GUIController)
 
-        # TODO: Complete the slice handler
-        self.slice_handler = SliceHandler(self)
+        self.network = Network()
 
-        # TODO: move inside the slice handler?
-        self.slices: List[Slice] = [
-            Slice(name="slice1", switches=[S[0], S[1], S[3]], hosts=[H[0], H[2]], min_rate=9000000, max_rate=9000000, rules={
-                "allowed_services": {
-                    "10.0.0.3": [9999, 9998],
-                },
-                "allowed_protocols": [Protocol.UDP.value],
-            }),
-            # Slice(name="slice2", switches=["s1", "s3", "s4"], hosts=["h2", "h4"], bandwidth=1000, rules={
-            #     "allowed_protocols": [Protocol.TCP.value],
-            # }),
-            Slice(name="slice3", switches=[S[0], S[2], S[3]], hosts=[H[0], H[1], H[2], H[3]], min_rate=1000, max_rate=1000, rules={
-                "allowed_protocols": [Protocol.ICMP.value],
-            }),
-        ]
-        logging.info("slices: " + str(self.slices))
-
-        self.link_to_slice_dict: Dict[str, List[Slice]] = {}
-        self.node_connections: Dict[str, List[Connection]] = {}
-        self.slice_utils = SliceUtils(self.link_to_slice_dict, self.node_connections)
-        self.queue_utils = QueueUtils(None, self.link_to_slice_dict, self.node_connections)
+        # TODO: Complete the slice manager
+        self.slices_manager = SlicesManager(self.network)
 
         # Initialize the network handler
-        self.network_handler = NetworkHandler(self)
+        self.network_manager = NetworkManager(self.network)
 
         # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
-        self.mac_to_port: Dict[str, Dict[str, Dict[str, Tuple[int, int]]]] = {}
+        self.mac_to_port = {}
 
     def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
@@ -113,6 +93,13 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
             data=data,
         )
         datapath.send_msg(out)
+
+    def update_topology(self):
+        """Abstract method defined in TopologyEventHandler to updated the network topology"""
+        logging.info("Updating topology...")
+
+        # TODO: add delay promise to wait for other simultaneous connections
+        TopologyUtils.build_network(self)
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
     def switch_features_handler(self, ev):
@@ -155,14 +142,14 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
         switch_id = Node.get_switch_id(dpid)
 
-        in_connection = self.slice_utils.get_in_connection(switch_id, in_port)
+        in_connection = SliceUtils.get_in_connection(switch_id, in_port)
         if not in_connection:
             logging.error("[ERROR] Could not find in_connection for switch %s port %s", switch_id, in_port)
             return
         logging.info(f"Incoming connection: {in_connection}")
 
         # for each slice, set the mac to port for the incoming port
-        slices = self.slice_utils.get_slices_from_packet(switch_id, pkt, in_connection)
+        slices = SliceUtils.get_slices_from_packet(switch_id, pkt, in_connection)
 
         # check if the packet belongs to a slice and send it to the corresponding port
         for slice in slices:
@@ -189,7 +176,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         else:
             logging.info("Packet does not belong to any slice")
         
-        outgoing_queues = self.queue_utils.get_queues_for_slices(switch_id, slices, in_connection, pkt)
+        outgoing_queues = QueueUtils.get_queues_for_slices(switch_id, slices, in_connection, pkt)
         logging.info(f"Outgoing queues: {outgoing_queues}")
 
         if outgoing_queues:
@@ -244,9 +231,9 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
     def _get_match_conditions_for_slice(self, slice: Optional[Slice], pkt: Packet, in_port: Optional[int] = None, invert_src_dst: bool = False) -> Dict:
         
         eth_header = pkt.get_protocol(ethernet.ethernet)
-        l3_packet = self.slice_utils.get_l3_packet(pkt)
+        l3_packet = SliceUtils.get_l3_packet(pkt)
         pkt_protocol = Protocol.from_id(l3_packet.proto) if l3_packet else None  # type: ignore
-        l4_packet = self.slice_utils.get_l4_packet(pkt, pkt_protocol)
+        l4_packet = SliceUtils.get_l4_packet(pkt, pkt_protocol)
         # TODO: check if l4_packet is None and handle it
         
         conditions = {
@@ -293,7 +280,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
     def _get_match_conditions_for_packet(self, pkt: Packet, in_port: int, slices: List[Slice]) -> Dict:
         eth_header = pkt.get_protocol(ethernet.ethernet)
-        l3_packet = self.slice_utils.get_l3_packet(pkt)
+        l3_packet = SliceUtils.get_l3_packet(pkt)
         pkt_protocol = Protocol.from_id(l3_packet.proto) if l3_packet else None  # type: ignore
         
         conditions = {
@@ -310,7 +297,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
             conditions["ipv4_src"] = src
             conditions["ipv4_dst"] = dst
             if pkt_protocol in [Protocol.UDP, Protocol.TCP]:
-                l4_packet = self.slice_utils.get_l4_packet(pkt, pkt_protocol)
+                l4_packet = SliceUtils.get_l4_packet(pkt, pkt_protocol)
                 # assuming the slices are active and are the incoming packet slices
                 logging.info(f"[_get_match_condictions_for_packet] Slices: {slices}")
                 logging.info(f"[_get_match_condictions_for_packet] {[s.rules['allowed_ports'] for s in slices]}")

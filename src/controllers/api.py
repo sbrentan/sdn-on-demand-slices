@@ -3,11 +3,11 @@ from typing import Union
 
 from webob import Response
 from ryu.app.wsgi import ControllerBase, route
+from ryu.topology.switches import Switch, Host
 
-from utils.topology import TopologyUtils, Switch, Host, Node
-from utils.slice import Slice
-from utils.constants import CONTROLLER_INSTANCE_NAME
-from controllers.utils.paths import ApiPaths
+from utils import TopologyUtils
+from common import Node, Slice, ApiPaths
+from common.constants import CONTROLLER_INSTANCE_NAME
 
 
 class APIController(ControllerBase):
@@ -107,7 +107,7 @@ class APIController(ControllerBase):
             logging.error(f"Error activating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
         slice = slice_match[0]
-        slice.activate()
+        slice.activate() # TODO: change?
         # TODO: implement slice activation (enable QoS queues on switches)
         return self._json_response(status="200 OK")
 
@@ -119,7 +119,7 @@ class APIController(ControllerBase):
             logging.error(f"Error deactivating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
         slice = slice_match[0]
-        slice.deactivate()
+        slice.deactivate() # TODO: change?
         # TODO: implement slice deactivation (disable QoS queues on switches)
         return self._json_response(status="200 OK")
 
