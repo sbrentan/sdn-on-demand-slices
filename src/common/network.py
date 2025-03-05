@@ -140,7 +140,7 @@ class Network:
     nodes: Dict[str, Node]
     connections: List[Connection]
 
-    update_events: List[Callable]
+    update_events: List[Callable] = []
 
     node_connections: Dict[str, List[Connection]]
     link_to_slice_dict: Dict[str, List[Slice]]
@@ -163,20 +163,23 @@ class Network:
         logging.info(f"Adding update event: {event}")
         self.update_events.append(event)
 
-    def get_instance(self) -> Network:
-        if self.__instance is None:
+    @classmethod
+    def get_instance(cls) -> Network:
+        if cls.__instance is None:
             raise ValueError("Network instance not initialized")
-        return self.__instance
+        return cls.__instance
 
     def __new__(cls, **kwargs) -> Network:
         if cls.__instance is None:
             cls.__instance = super().__new__(cls, **kwargs)
         else:
+            logging.info(f"Reusing existing network instance ({len(cls.__instance.update_events)} events)")
             for key, value in kwargs.items():
                 setattr(cls.__instance, key, value)
-        for event in cls.__instance.update_events:
-            logging.info(f"Calling update event: {event.__name__}")
-            event()
+            for event in cls.__instance.update_events:
+                logging.info(f"Calling update event: {event.__name__}")
+                event()
+        logging.debug(f"Network instance address: {id(cls.__instance)}")
         return cls.__instance
 
     def __repr__(self) -> str:

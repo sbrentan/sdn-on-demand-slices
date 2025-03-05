@@ -43,7 +43,7 @@ class SlicesManager:
         for slice in self.slices:
             if not slice.active:
                 continue
-            for connection in self.connections:
+            for connection in self.network.connections:
                 connection_id = Connection.get_link_id(connection)
                 if connection_id not in link_to_slice_dict:
                     link_to_slice_dict[connection_id] = []

@@ -1,6 +1,11 @@
 #!/bin/bash
 
-module_path="/comnetsemu/app/sdn-on-demand-slices"
+cd "$(dirname "$0")/src"
+
+module_path="$(pwd)"
+
+echo "Module path: $module_path"
+
 if [[ ":$PYTHONPATH:" != *":$module_path:"* ]]; then
     export PYTHONPATH="${PYTHONPATH:+"$PYTHONPATH:"}$module_path"
     echo $PYTHONPATH

@@ -5,7 +5,7 @@ from ryu.lib import dpid as dpid_lib
 from ryu.lib.packet import ethernet
 from ryu.lib.packet.packet import Packet
 
-from utils import TopologyUtils
+from .topology import TopologyUtils
 from common import Connection, Network, Node, Slice, Queue
 from common.constants import CONTROLLER_IP, CONTROLLER_PORT, OVSDB_ADDR, NETWORK_MAX_RATE
 
@@ -102,7 +102,7 @@ class QueueUtils:
             # status, result = QueueUtils.delete_queues(dst_dpid, dst_port)
             # logging.info(f"QueueUtils.delete_queues for connection ({connection}) dst {dst_dpid} {dst_port}: {status} {result}")
 
-        for _, switch in TopologyUtils.switches.items():
+        for _, switch in network.switches.items():
             node_id = Node.get_node_id(switch)
             switch_connections = network.node_connections.get(node_id, [])
             for connection in switch_connections:

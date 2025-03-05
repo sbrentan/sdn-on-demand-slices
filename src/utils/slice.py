@@ -25,6 +25,8 @@ class SliceUtils:
             Connection: Incoming connection of the packet
         """
         network = Network.get_instance()
+        logging.info(f"[get_in_connection] Connections: {network.connections}")
+        logging.info(f"[get_in_connection] Node connections: {network.node_connections}")
         connections = network.node_connections.get(switch_id, [])
         logging.info(f"[get_in_connection] Switch connections: {connections} for switch {switch_id}")
         for connection in connections:
@@ -60,7 +62,7 @@ class SliceUtils:
         else:
             return False
 
-        if SliceUtils.is_services_valid(pkt):
+        if SliceUtils.is_services_valid(slice, pkt):
             logging.info("[is_slice_valid_for_pkt] Services valid")
         else:
             return False

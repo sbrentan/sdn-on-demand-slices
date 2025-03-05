@@ -10,6 +10,7 @@ from common import Node, Slice, ApiPaths
 from common.constants import CONTROLLER_INSTANCE_NAME
 
 
+# TODO: change TopologyUtils.connections to Network.connections
 class APIController(ControllerBase):
     def __init__(self, req, link, data, **config):
         super(APIController, self).__init__(req, link, data, **config)

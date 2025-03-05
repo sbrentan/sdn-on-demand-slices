@@ -93,6 +93,8 @@ class TopologyUtils:
                 link_ref=None,  # no link exists between host and switch
                 queues=[]
             ))
+
+        logging.info("Connections: %s", connections)
         
         # While this is not returned, as it is implemented as a Singleton, it is stored in the class
         Network(
