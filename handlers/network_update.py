@@ -42,6 +42,8 @@ class NetworkHandler:
 
                         self.init_slices(self.controller_instance.slices)
                         break
+                    else:
+                        logging.info(f"Number of hosts and switches do not match... {num_hosts} != {current_hosts} or {num_switches} != {current_switches}")
             hub.sleep(NETWORK_UPDATE_TIMEOUT)
 
     def init_node_connections(self):

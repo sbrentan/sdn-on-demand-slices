@@ -5,6 +5,8 @@ from typing import Optional, Dict, List, Tuple
 from ryu.lib import dpid as dpid_lib
 from ryu.lib.packet import ethernet
 from ryu.lib.packet.packet import Packet
+from ryu.lib.ovs.bridge import OVSBridge
+from ryu.cfg import CONF
 
 from utils.topology import Connection, Switch, Network, Node, TopologyUtils
 from utils.slice import Slice
@@ -33,6 +35,7 @@ class Queue:
     #     return Queue(switch=switch, connection=connection, queue_id=0, min_rate=min_rate, max_rate=max_rate)
     
     def to_queue_dict(self):
+        # TODO: change this if OVSBridge is used instead of REST API
         queue_dict = {}
         if self.min_rate is not None:
             queue_dict["min_rate"] = str(self.min_rate)
@@ -194,6 +197,23 @@ class QueueUtils:
             "max_rate": str(NETWORK_MAX_RATE),
             "queues": [queue.to_queue_dict() for queue in queues]
         }
+
+        # TODO: decide what do do (keep OVSBridge or use the REST API) ??? Consider that OVSBridge is 2x faster
+
+        # data = {
+        #     "port_name": port_name.decode("utf-8"),
+        #     "type": "linux-htb",
+        #     "max_rate": str(NETWORK_MAX_RATE),
+        #     "queues": [{"max-rate": "10000", "min-rate": "1000"}]
+        # }
+        
+        # logging.info(f"{json.dumps(data, indent=4)}")
+
+        # ovs_bridge = OVSBridge(CONF, datapath_id=dpid, ovsdb_addr="tcp:127.0.0.1:6632", timeout=10)
+        # start_time = time.time()
+        # ovs_bridge.set_qos(port_name=data["port_name"], type=data["type"], max_rate=data["max_rate"], queues=data["queues"])
+        # end_time = time.time() - start_time
+        # logging.info(f"Time taken {end_time}s")
         
         logging.info(f"URL: {url}, Data: {json.dumps(data, indent=4)}")
 
