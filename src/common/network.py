@@ -142,8 +142,9 @@ class Network:
 
     update_events: List[Callable] = []
 
-    node_connections: Dict[str, List[Connection]]
-    link_to_slice_dict: Dict[str, List[Slice]]
+    slices: List[Slice] = []
+    node_connections: Dict[str, List[Connection]] = {}
+    link_to_slice_dict: Dict[str, List[Slice]] = {}
 
     def __init__(self, switches=None, links=None, hosts=None, connections=None, nodes=None):
         self.switches = switches if switches else {}

@@ -80,6 +80,8 @@ class QueueUtils:
 
     @staticmethod
     def init_queues():
+
+        # TODO: edit queues based on previous existing queues (is a new switch is added, edit only the connected switches queues)
         
         network = Network.get_instance()
         if network is None:

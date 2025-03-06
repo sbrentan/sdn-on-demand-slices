@@ -10,13 +10,12 @@ H = ["h00:00:00:00:00:01", "h00:00:00:00:00:02", "h00:00:00:00:00:03", "h00:00:0
 class SlicesManager:
 
     network: Network
-    slices: List[Slice] = []
 
     def __init__(self, network: Network):
         self.network = network
     
         # TODO: read from file ???
-        self.slices: List[Slice] = [
+        self.network.slices = [
             Slice(name="slice1", switches=[S[0], S[1], S[3]], hosts=[H[0], H[2]], min_rate=9000000, max_rate=9000000, rules={
                 "allowed_services": {
                     "10.0.0.3": [9999, 9998],
@@ -30,7 +29,7 @@ class SlicesManager:
                 "allowed_protocols": [Protocol.ICMP.value],
             }),
         ]
-        logging.info("slices: " + str(self.slices))
+        logging.info("slices: " + str(self.network.slices))
 
         self.network.add_update_event(self.init_slices)
         
@@ -40,7 +39,7 @@ class SlicesManager:
             return
         logging.info("Initializing slices...")
         link_to_slice_dict = {}
-        for slice in self.slices:
+        for slice in self.network.slices:
             if not slice.active:
                 continue
             for connection in self.network.connections:

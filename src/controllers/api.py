@@ -5,18 +5,14 @@ from webob import Response
 from ryu.app.wsgi import ControllerBase, route
 from ryu.topology.switches import Switch, Host
 
-from utils import TopologyUtils
-from common import Node, Slice, ApiPaths
-from common.constants import CONTROLLER_INSTANCE_NAME
+from common import Node, Slice, ApiPaths, Network
 
 
-# TODO: change TopologyUtils.connections to Network.connections
 class APIController(ControllerBase):
     def __init__(self, req, link, data, **config):
         super(APIController, self).__init__(req, link, data, **config)
 
-        from ryu_app import DynamicSlicingController
-        self.controller_instance: DynamicSlicingController = data[CONTROLLER_INSTANCE_NAME]
+        self.network = Network.get_instance()
 
     def _json_response(self, data: Union[dict, list, None] = None, status: str = "200 OK") -> Response:
         if data:
@@ -30,12 +26,12 @@ class APIController(ControllerBase):
         """REST endpoint to get the slices."""
         slices_dict = []
         slice_links = {}
-        for connection in TopologyUtils.connections:
-            for slice in self.controller_instance.link_to_slice_dict[connection.link_id]:
+        for connection in self.network.connections:
+            for slice in self.network.link_to_slice_dict[connection.link_id]:
                 if slice.name not in slice_links:
                     slice_links[slice.name] = []
                 slice_links[slice.name].append(connection.link_id)
-        for slice in self.controller_instance.slices:
+        for slice in self.network.slices:
             slice_dict = slice.to_dict()
             slice_dict['links'] = slice_links[slice.name] if slice.name in slice_links else []
             slices_dict.append(slice_dict)
@@ -44,13 +40,13 @@ class APIController(ControllerBase):
     @route('get_slice', ApiPaths.SLICE(), methods=['GET'])
     def get_slice(self, req, slice_id, **kwargs):
         """REST endpoint to get the details of a specific slice."""
-        slice = [s for s in self.controller_instance.slices if s.name == slice_id]
+        slice = [s for s in self.network.slices if s.name == slice_id]
         if not slice:
             return self._json_response(status="404 Not Found")
         slice_dict = slice[0].to_dict()
         slice_links = []
-        for connection in TopologyUtils.connections:
-            if slice[0] in self.controller_instance.link_to_slice_dict[connection.link_id]:
+        for connection in self.network.connections:
+            if slice[0] in self.network.link_to_slice_dict[connection.link_id]:
                 slice_links.append(connection.link_id)
         slice_dict['links'] = slice_links
         return self._json_response(data=slice_dict)
@@ -63,10 +59,10 @@ class APIController(ControllerBase):
         except Exception as e:
             logging.error(f"Error creating slice: {e}")
             return self._json_response(status="400 Bad Request")
-        if [s for s in self.controller_instance.slices if s.name == slice_data["name"]]:
+        if [s for s in self.network.slices if s.name == slice_data["name"]]:
             logging.error(f"Error creating slice {slice_data['name']}: already exists")
             return self._json_response(status="409 Conflict")
-        self.controller_instance.slices.append(Slice.from_dict(slice_data))
+        self.network.slices.append(Slice.from_dict(slice_data))
         return self._json_response(status="201 Created")
 
     @route('update_slice', ApiPaths.SLICES(), methods=['PUT'])
@@ -78,7 +74,7 @@ class APIController(ControllerBase):
         except Exception as e:
             logging.error(f"Error updating slice: {e}")
             return self._json_response(status="400 Bad Request")
-        slice_match = [s for s in self.controller_instance.slices if s.name == slice_id]
+        slice_match = [s for s in self.network.slices if s.name == slice_id]
         if not slice_match:
             logging.error(f"Error updating slice {slice_data['name']}: not found")
             return self._json_response(status="404 Not Found")
@@ -93,17 +89,17 @@ class APIController(ControllerBase):
         except Exception as e:
             logging.error(f"Error deleting slice: {e}")
             return self._json_response(status="400 Bad Request")
-        slice_match = [s for s in self.controller_instance.slices if s.name == slice_id]
+        slice_match = [s for s in self.network.slices if s.name == slice_id]
         if not slice_match:
             logging.error(f"Error deleting slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
-        self.controller_instance.slices.remove(slice_match[0])
+        self.network.slices.remove(slice_match[0])
         return self._json_response(status="204 No Content")
 
     @route('activate_slice', ApiPaths.ACTIVATE_SLICE(), methods=['GET'])
     def activate_slice(self, req, slice_id, **kwargs):
         """REST endpoint to activate a slice."""
-        slice_match = [s for s in self.controller_instance.slices if s.name == slice_id]
+        slice_match = [s for s in self.network.slices if s.name == slice_id]
         if not slice_match:
             logging.error(f"Error activating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
@@ -115,7 +111,7 @@ class APIController(ControllerBase):
     @route('deactivate_slice', ApiPaths.DEACTIVATE_SLICE(), methods=['GET'])
     def deactivate_slice(self, req, slice_id, **kwargs):
         """REST endpoint to deactivate a slice."""
-        slice_match = [s for s in self.controller_instance.slices if s.name == slice_id]
+        slice_match = [s for s in self.network.slices if s.name == slice_id]
         if not slice_match:
             logging.error(f"Error deactivating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
@@ -131,8 +127,8 @@ class APIController(ControllerBase):
     def get_nodes(self, req, **kwargs):
         """REST endpoint to get the topology nodes."""
         nodes = []
-        hosts = TopologyUtils.get_all_hosts(self.controller_instance)
-        for node_id, node in TopologyUtils.nodes.items():
+        hosts = self.network.hosts
+        for node_id, node in self.network.nodes.items():
             node_dict = {
                 "id": node_id,
                 "type": node.node_type,
@@ -150,7 +146,7 @@ class APIController(ControllerBase):
     def get_switches(self, req, **kwargs):
         """REST endpoint to get the topology switches."""
         switches = []
-        for switch_id, switch in TopologyUtils.switches.items():
+        for switch_id, switch in self.network.switches.items():
             switches.append({
                 "id": switch_id,
                 "dpid": switch.dp.id
@@ -160,7 +156,7 @@ class APIController(ControllerBase):
     @route('get_switch', ApiPaths.SWITCH(), methods=['GET'])
     def get_switch(self, req, switch_id, **kwargs):
         """REST endpoint to get the details of a specific switch."""
-        switch = TopologyUtils.switches[switch_id]
+        switch = self.network.switches[switch_id]
         return self._json_response(data={
             "id": switch_id,
             "dpid": switch.dp.id
@@ -170,7 +166,7 @@ class APIController(ControllerBase):
     def get_hosts(self, req, **kwargs):
         """REST endpoint to get the topology hosts."""
         hosts = []
-        for host_id, host in TopologyUtils.hosts.items():
+        for host_id, host in self.network.hosts.items():
             hosts.append({
                 "id": host_id,
                 "ip": host.ipv4,
@@ -181,7 +177,7 @@ class APIController(ControllerBase):
     @route('get_host', ApiPaths.HOST(), methods=['GET'])
     def get_host(self, req, host_id, **kwargs):
         """REST endpoint to get the details of a specific host."""
-        host = TopologyUtils.hosts[host_id]
+        host = self.network.hosts[host_id]
         return self._json_response(data={
             "id": host_id,
             "ip": host.ipv4,
@@ -192,7 +188,7 @@ class APIController(ControllerBase):
     def get_links(self, req, **kwargs):
         """REST endpoint to get the topology links."""
         links = []
-        for connection in TopologyUtils.connections:
+        for connection in self.network.connections:
             links.append({
                 "id": connection.link_id,
                 "source": connection.src[1].node_id,

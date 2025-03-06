@@ -28,7 +28,7 @@ ryu-manager --observe-links ryu_app.py > "$log_file" 2>&1 &
 
 # echo "Ryu controller started with PID: $ryu_manager_pid"
 
-sleep 5
+sleep 2
 
 echo "Starting Mininet network..."
 sudo python3 network.py

@@ -2,6 +2,7 @@ import json
 import logging
 from typing import Dict, List, Tuple, Optional
 
+from ryu.lib import hub
 from ryu.base import app_manager
 from ryu.topology import switches
 from ryu.controller import ofp_event
@@ -15,8 +16,8 @@ from events.topology import TopologyEventHandler
 from managers import NetworkManager, SlicesManager
 from controllers import APIController, GUIController
 from utils import SliceUtils, QueueUtils, TopologyUtils
-from common import Network, Node, Slice, Protocol, Queue 
-from common.constants import CONTROLLER_INSTANCE_NAME, OVSDB_TIMEOUT, FlowPriority
+from common import Network, Node, Slice, Protocol, Queue
+from common.constants import OVSDB_TIMEOUT, FlowPriority
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -42,7 +43,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
         # Register the API and GUI controllers
         wsgi = kwargs['wsgi']
-        wsgi.register(APIController, {CONTROLLER_INSTANCE_NAME: self})
+        wsgi.register(APIController)
         wsgi.register(GUIController)
 
         self.network = Network()
@@ -52,6 +53,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
         # Initialize the network handler
         self.network_manager = NetworkManager(self.network)
+        self.build_network_greenlet = None
 
         # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
         self.mac_to_port = {}
@@ -98,8 +100,23 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         """Abstract method defined in TopologyEventHandler to updated the network topology"""
         logging.info("Updating topology...")
 
-        # TODO: add delay promise to wait for other simultaneous connections
-        TopologyUtils.build_network(self)
+        # Add delay to wait for other simultaneous connections
+        if self.build_network_greenlet is not None:
+            logging.info("Cancelling previous build network timer")
+            hub.kill(self.build_network_greenlet)
+        
+        def build_network_task():
+            logging.info("Topology updated")
+
+            TopologyUtils.build_network(self)
+            
+            logging.info('Initializing queues...')
+            QueueUtils.init_queues()
+
+            self.build_network_greenlet = None
+            
+        logging.info("Starting build network timer")
+        self.build_network_greenlet = hub.spawn_after(1, build_network_task)
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER) # type: ignore
     def switch_features_handler(self, ev):
@@ -116,6 +133,9 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER) # type: ignore
     def _packet_in_handler(self, ev):
+        if self.build_network_greenlet:
+            logging.info("Waiting for network to be built...")
+            return
         msg = ev.msg
         datapath = msg.datapath
         in_port = msg.match["in_port"]
@@ -129,6 +149,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         dst = eth.dst  # type: ignore
         dpid = datapath.id
 
+        logging.info(f"---------------------- {self.network.link_to_slice_dict}")
 
         # TODO:
         # 1. Check if slice.active is correctly implemented

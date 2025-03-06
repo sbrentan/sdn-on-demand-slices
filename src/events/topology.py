@@ -8,23 +8,15 @@ from utils import QueueUtils
 
 
 # TODO: updated with initialization request on slice adding (or when loading from file)
-HOSTS = 4
-SWITCHES = 4
 
 
 class TopologyEventHandler(abc.ABC):
-
-    num_hosts = 0
-    num_switches = 0
-    initialized = False
 
     @set_ev_cls(event.EventHostAdd)
     def host_add_handler(self, ev):
         host = ev.host
         logging.info('Host added: %s', host.mac)
         self.update_topology()
-        self.num_hosts += 1
-        self.init_queues()
 
     @set_ev_cls(event.EventHostDelete)
     def host_delete_handler(self, ev):
@@ -38,8 +30,6 @@ class TopologyEventHandler(abc.ABC):
         logging.info('Switch entered: %s', switch.dp.id)
         QueueUtils.set_ovsdb_address(switch.dp.id) # TODO: needed with OVSDB bridge?
         self.update_topology()
-        self.num_switches += 1
-        self.init_queues()
 
     @set_ev_cls(event.EventSwitchLeave)
     def switch_leave_handler(self, ev):
@@ -64,9 +54,3 @@ class TopologyEventHandler(abc.ABC):
     @abc.abstractmethod
     def update_topology(self):
         raise NotImplementedError
-    
-    def init_queues(self):
-        if self.num_hosts == HOSTS and self.num_switches == SWITCHES and not self.initialized:
-            self.initialized = True
-            logging.info('Initializing queues...')
-            QueueUtils.init_queues()

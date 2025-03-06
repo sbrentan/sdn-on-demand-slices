@@ -4,13 +4,11 @@ from enum import Enum
 DEBUG = False
 
 # Ryu Controller Constants
-CONTROLLER_INSTANCE_NAME = "dynamic_slicing_controller"
 CONTROLLER_IP = "localhost"
 CONTROLLER_PORT = 8080
 OVSDB_ADDR = "tcp:127.0.0.1:6632"
 OVSDB_TIMEOUT = 10  # In seconds
 NETWORK_MAX_RATE = 10000000000  # In bps (=10 Gbps)
-NETWORK_UPDATE_TIMEOUT = 2  # In seconds
 
 # Base URL Constants
 API_BASE_URL = "/api"
