@@ -15,7 +15,7 @@ from ryu.app.wsgi import WSGIApplication
 from events.topology import TopologyEventHandler
 from managers import NetworkManager, SlicesManager
 from controllers import APIController, GUIController
-from utils import SliceUtils, QueueUtils, TopologyUtils
+from utils import SliceUtils, QueueUtils, TopologyUtils, PacketUtils
 from common import Network, Node, Slice, Protocol, Queue
 from common.constants import OVSDB_TIMEOUT, FlowPriority
 
@@ -41,11 +41,6 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         # Increase timeout for OVSDB operations  TODO: remove?
         self.CONF.set_override('ovsdb_timeout', OVSDB_TIMEOUT)
 
-        # Register the API and GUI controllers
-        wsgi = kwargs['wsgi']
-        wsgi.register(APIController)
-        wsgi.register(GUIController)
-
         self.network = Network()
 
         # TODO: Complete the slice manager
@@ -55,20 +50,13 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         self.network_manager = NetworkManager(self.network)
         self.build_network_greenlet = None
 
+        # Register the API and GUI controllers
+        wsgi = kwargs['wsgi']
+        wsgi.register(APIController, {"slices_manager": self.slices_manager})
+        wsgi.register(GUIController)
+
         # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
         self.mac_to_port = {}
-
-    def add_flow(self, datapath, priority, match, actions):
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-
-        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
-
-        # Set table_id to 1 for the QoS 
-        mod = parser.OFPFlowMod(
-            datapath=datapath, table_id=1, priority=priority, match=match, instructions=inst
-        )
-        datapath.send_msg(mod)
 
     # TODO: Use this method to delete flows
     def delete_flow(self, datapath, match):
@@ -81,20 +69,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         )
         datapath.send_msg(mod)
     
-    def _send_package(self, msg, datapath, in_port, actions):
-        data = None
-        ofproto = datapath.ofproto
-        if msg.buffer_id == ofproto.OFP_NO_BUFFER:
-            data = msg.data
-
-        out = datapath.ofproto_parser.OFPPacketOut(
-            datapath=datapath,
-            buffer_id=msg.buffer_id,
-            in_port=in_port,
-            actions=actions,
-            data=data,
-        )
-        datapath.send_msg(out)
+    
 
     def update_topology(self):
         """Abstract method defined in TopologyEventHandler to updated the network topology"""
@@ -129,7 +104,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         actions = [
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
         ]
-        self.add_flow(datapath, FlowPriority.TABLE_MISS.value, match, actions)
+        PacketUtils.add_flow(datapath, FlowPriority.TABLE_MISS.value, match, actions)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER) # type: ignore
     def _packet_in_handler(self, ev):
@@ -184,8 +159,8 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                     datapath.ofproto_parser.OFPActionOutput(out_port)
                 ]
                 match = datapath.ofproto_parser.OFPMatch(**match_conditions)
-                self.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
-                self._send_package(msg, datapath, in_port, actions)
+                PacketUtils.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
+                PacketUtils.send_package(msg, datapath, in_port, actions)
                 logging.info(f"Packet sent to slice {Slice.get_slice_id(slice)} from port {in_port} to port {out_port} to queue {queue_id}")
                 # TODO: isn't it more correct to add a flow for each slice?
                 return
@@ -225,10 +200,10 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                 if connection.is_host_connection and connection.host_mac == dst:
                     priority = FlowPriority.DEFAULT.value
                     logging.info("Packet reached final destination, setting priority to DEFAULT")
-            self.add_flow(datapath, priority, match, actions)
+            PacketUtils.add_flow(datapath, priority, match, actions)
             
             # flood the packet to all specified connections (after adding flows) 
-            self._send_package(msg, datapath, in_port, actions)
+            PacketUtils.send_package(msg, datapath, in_port, actions)
         else:
             logging.info("No outgoing connections found for the packet, DROPPING it")
             # TODO: send flow to DROP it?
@@ -335,6 +310,6 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
 app_manager.require_app('ryu.app.rest_qos') # Needed for managing queues
 app_manager.require_app('ryu.app.rest_conf_switch') # Needed for updating ovdb address
+app_manager.require_app('ryu.app.ofctl_rest') # Needed for deleting flows
 
 # app_manager.require_app('ryu.app.rest_topology')
-# app_manager.require_app('ryu.app.ofctl_rest')

@@ -140,14 +140,6 @@ class Slice:
         self.max_rate = data["max_rate"] if "max_rate" in data else self.max_rate 
         # TODO: call self.__post_init__() to validate rules??    
 
-    def activate(self):
-        logging.info(f"Activating slice {self.name}")
-        self.active = True
-    
-    def deactivate(self):
-        logging.info(f"Deactivating slice {self.name}")
-        self.active = False
-
     @staticmethod
     def from_dict(data: dict) -> Slice:
         return Slice(

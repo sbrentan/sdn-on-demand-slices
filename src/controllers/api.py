@@ -6,6 +6,7 @@ from ryu.app.wsgi import ControllerBase, route
 from ryu.topology.switches import Switch, Host
 
 from common import Node, Slice, ApiPaths, Network
+from managers.slices import SlicesManager
 
 
 class APIController(ControllerBase):
@@ -13,6 +14,8 @@ class APIController(ControllerBase):
         super(APIController, self).__init__(req, link, data, **config)
 
         self.network = Network.get_instance()
+
+        self.slices_manager: SlicesManager = data['slices_manager']
 
     def _json_response(self, data: Union[dict, list, None] = None, status: str = "200 OK") -> Response:
         if data:
@@ -104,8 +107,7 @@ class APIController(ControllerBase):
             logging.error(f"Error activating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
         slice = slice_match[0]
-        slice.activate() # TODO: change?
-        # TODO: implement slice activation (enable QoS queues on switches)
+        self.slices_manager.enable_slice(slice)
         return self._json_response(status="200 OK")
 
     @route('deactivate_slice', ApiPaths.DEACTIVATE_SLICE(), methods=['GET'])
@@ -116,8 +118,7 @@ class APIController(ControllerBase):
             logging.error(f"Error deactivating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
         slice = slice_match[0]
-        slice.deactivate() # TODO: change?
-        # TODO: implement slice deactivation (disable QoS queues on switches)
+        self.slices_manager.disable_slice(slice)
         return self._json_response(status="200 OK")
 
 

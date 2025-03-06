@@ -212,15 +212,16 @@ class QueueUtils:
         url = f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}/qos/queue/{dpid_str}"
 
         # Prepare the data to be sent in the DELETE request
-        data = {"port_name": port_name.decode("utf-8")}
+        # data = {"port_name": port_name.decode("utf-8")}
         
-        logging.info(f"URL: {url}, Data: {data}")
+        # logging.info(f"URL: {url}, Data: {data}")
         
         try:
+            logging.info(f"Deleting queues for switch {dpid}")
             response = httpx.request(
                 method="DELETE",
                 url=url,
-                data=json.dumps(data) #type: ignore
+                # data=json.dumps(data) #type: ignore
             )
             response_status = response.status_code  # Get the status code of the response
             response_data = response.text  # Read and decode the response
