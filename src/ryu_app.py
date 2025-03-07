@@ -57,17 +57,6 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
         # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
         self.mac_to_port = {}
-
-    # TODO: Use this method to delete flows
-    def delete_flow(self, datapath, match):
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-        
-        mod = parser.OFPFlowMod(
-            datapath=datapath, table_id=1, command=ofproto.OFPFC_DELETE, out_port=ofproto.OFPP_ANY,
-            out_group=ofproto.OFPG_ANY, match=match
-        )
-        datapath.send_msg(mod)
     
     
 
@@ -206,7 +195,8 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
             PacketUtils.send_package(msg, datapath, in_port, actions)
         else:
             logging.info("No outgoing connections found for the packet, DROPPING it")
-            # TODO: send flow to DROP it?
+            drop_match = datapath.ofproto_parser.OFPMatch(**self._get_match_conditions_for_packet(pkt, in_port, slices))
+            PacketUtils.add_flow(datapath, FlowPriority.DROP.value, drop_match, [])
 
     def _get_port_for_mac_and_slice(self, switch_id: str, slice_name: str, mac: str) -> Optional[Tuple[int, int]]:
         switch_slices = self.mac_to_port.get(switch_id, None)
@@ -310,6 +300,5 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
 app_manager.require_app('ryu.app.rest_qos') # Needed for managing queues
 app_manager.require_app('ryu.app.rest_conf_switch') # Needed for updating ovdb address
-app_manager.require_app('ryu.app.ofctl_rest') # Needed for deleting flows
 
 # app_manager.require_app('ryu.app.rest_topology')

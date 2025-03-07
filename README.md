@@ -82,6 +82,7 @@ h1 ping -c3 h2
 iperf h1 h3 (test bandwidth)
 sh ovs-ofctl dump-flows s1
 xterm h1 h2 (to open host-specific terminal windows)
+h1 python3 commands/send_packet.py -ip 10.0.0.3 -t udp -p 9999
 ```
 
 To run a command in background from a specific host (e.g. h3 iperf) inside mininet window:

@@ -207,14 +207,9 @@ class QueueUtils:
         return None, ""
 
     @staticmethod
-    def delete_queues(dpid, port_name) -> Tuple:
+    def delete_queues(dpid) -> Tuple:
         dpid_str = dpid_lib.dpid_to_str(dpid)
         url = f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}/qos/queue/{dpid_str}"
-
-        # Prepare the data to be sent in the DELETE request
-        # data = {"port_name": port_name.decode("utf-8")}
-        
-        # logging.info(f"URL: {url}, Data: {data}")
         
         try:
             logging.info(f"Deleting queues for switch {dpid}")

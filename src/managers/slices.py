@@ -1,8 +1,7 @@
 import logging
 
 from common import Network, Connection, Slice, Protocol, NodeType
-from utils.queue import QueueUtils
-from managers.network import NetworkManager
+from utils import QueueUtils, PacketUtils, SliceUtils
 
 
 S = ["s1", "s2", "s3", "s4"]
@@ -39,7 +38,7 @@ class SlicesManager:
             logging.error("[INIT SLICES] Network not initialized yet...")
             return
         logging.info("Initializing slices...")
-        link_to_slice_dict = self._get_link_to_slice_dict()
+        link_to_slice_dict = SliceUtils.get_link_to_slice_dict()
         logging.info("link_to_slice dicts: " + str(link_to_slice_dict))
         self.network.link_to_slice_dict = link_to_slice_dict
 
@@ -51,26 +50,8 @@ class SlicesManager:
         slice.active = False
         self._reset_switches_for_slice(slice)
 
-    def _get_link_to_slice_dict(self, skip_active_slices=True) -> dict:
-        link_to_slice_dict = {}
-        for slice in self.network.slices:
-            if skip_active_slices and not slice.active:
-                continue
-            for connection in self.network.connections:
-                connection_id = Connection.get_link_id(connection)
-                if connection_id not in link_to_slice_dict:
-                    link_to_slice_dict[connection_id] = []
-                if connection.is_host_connection:
-                    if connection.src[1].ref_id in slice.hosts:
-                        if slice.name not in [s.name for s in link_to_slice_dict[connection_id]]:
-                            link_to_slice_dict[connection_id].append(slice)
-                elif connection.src[1].ref_id in slice.switches and connection.dst[1].ref_id in slice.switches:
-                    if slice.name not in [s.name for s in link_to_slice_dict[connection_id]]:
-                        link_to_slice_dict[connection_id].append(slice)
-        return link_to_slice_dict
-
     def _reset_switches_for_slice(self, slice: Slice):
-        link_to_slice_dict = self._get_link_to_slice_dict(skip_active_slices=False)
+        link_to_slice_dict = SliceUtils.get_link_to_slice_dict(skip_active_slices=False)
         affected_switches = {}
         for connection in self.network.connections:
             connection_id = Connection.get_link_id(connection)
@@ -82,8 +63,8 @@ class SlicesManager:
         logging.info(f"Affected switches: {affected_switches}")
         self.init_slices()
         for switch in affected_switches.values():
-            QueueUtils.delete_queues(switch.dp.id, 0)
-            NetworkManager.delete_flows(switch)
+            QueueUtils.delete_queues(switch.dp.id)
+            PacketUtils.delete_flows(switch)
 
     # TODO: implement logic for initializing the slices (e.g., default slice templates or from a file)
     # TODO: move logic for creating, updating, deleting slices from API controller to here

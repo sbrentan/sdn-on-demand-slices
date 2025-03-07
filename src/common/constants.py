@@ -22,3 +22,4 @@ class FlowPriority(Enum):
     TABLE_MISS = 0
     FLOODING = 1
     DEFAULT = 2
+    DROP = 3

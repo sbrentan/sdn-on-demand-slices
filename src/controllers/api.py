@@ -7,6 +7,7 @@ from ryu.topology.switches import Switch, Host
 
 from common import Node, Slice, ApiPaths, Network
 from managers.slices import SlicesManager
+from utils import SliceUtils
 
 
 class APIController(ControllerBase):
@@ -29,8 +30,9 @@ class APIController(ControllerBase):
         """REST endpoint to get the slices."""
         slices_dict = []
         slice_links = {}
+        link_to_slice_dict = SliceUtils.get_link_to_slice_dict(skip_active_slices=False)
         for connection in self.network.connections:
-            for slice in self.network.link_to_slice_dict[connection.link_id]:
+            for slice in link_to_slice_dict[connection.link_id]:
                 if slice.name not in slice_links:
                     slice_links[slice.name] = []
                 slice_links[slice.name].append(connection.link_id)

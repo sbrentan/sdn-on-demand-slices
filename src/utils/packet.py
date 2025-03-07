@@ -1,4 +1,8 @@
+import logging
 
+from ryu.topology.switches import Switch
+
+from common.constants import FlowPriority
 
 class PacketUtils:
 
@@ -14,6 +18,34 @@ class PacketUtils:
             datapath=datapath, table_id=1, priority=priority, match=match, instructions=inst
         )
         datapath.send_msg(mod)
+
+    @staticmethod
+    def delete_flow(datapath, match):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        mod = parser.OFPFlowMod(
+            datapath=datapath, table_id=1, command=ofproto.OFPFC_DELETE, out_port=ofproto.OFPP_ANY,
+            out_group=ofproto.OFPG_ANY, match=match
+        )
+        datapath.send_msg(mod)
+
+    @staticmethod
+    def delete_flows(switch: Switch):
+        ofproto = switch.dp.ofproto
+        parser = switch.dp.ofproto_parser
+        match = switch.dp.ofproto_parser.OFPMatch()
+
+        logging.info(f"Deleting flows for switch {switch.dp.id}")
+
+        # Delete all flows
+        PacketUtils.delete_flow(switch.dp, match)
+
+        # Add table-miss flow entry
+        actions = [
+            parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
+        ]
+        PacketUtils.add_flow(switch.dp, FlowPriority.TABLE_MISS.value, match, actions)
 
     @staticmethod
     def send_package(msg, datapath, in_port, actions):

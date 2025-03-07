@@ -124,6 +124,26 @@ class SliceUtils:
                 if dst_port in slice.rules["allowed_services"][dst]:
                     services_valid = True
         return services_valid
+    
+    @staticmethod
+    def get_link_to_slice_dict(skip_active_slices=True) -> dict:
+        link_to_slice_dict = {}
+        network = Network.get_instance()
+        for slice in network.slices:
+            if skip_active_slices and not slice.active:
+                continue
+            for connection in network.connections:
+                connection_id = Connection.get_link_id(connection)
+                if connection_id not in link_to_slice_dict:
+                    link_to_slice_dict[connection_id] = []
+                if connection.is_host_connection:
+                    if connection.src[1].ref_id in slice.hosts:
+                        if slice.name not in [s.name for s in link_to_slice_dict[connection_id]]:
+                            link_to_slice_dict[connection_id].append(slice)
+                elif connection.src[1].ref_id in slice.switches and connection.dst[1].ref_id in slice.switches:
+                    if slice.name not in [s.name for s in link_to_slice_dict[connection_id]]:
+                        link_to_slice_dict[connection_id].append(slice)
+        return link_to_slice_dict
 
     @staticmethod
     def get_l3_packet(pkt: Packet) -> Optional[PacketBase]:
