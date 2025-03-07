@@ -231,34 +231,34 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         if slice:
             if slice.rules["allowed_protocols"] and pkt_protocol:
                 if pkt_protocol not in slice.rules["allowed_protocols"]:
-                    logging.info(f"[ERROR] Protocol {pkt_protocol} not allowed for slice {slice.name}")
+                    logging.info(f"[ERROR] Protocol {pkt_protocol} not allowed for slice {slice.id}")
                 conditions["ip_proto"] = pkt_protocol.protocol_id
         if slice and l4_packet:
             if slice.rules["allowed_ports"]:
                 dst_port = l4_packet.dst_port if not invert_src_dst else l4_packet.src_port  # type: ignore
                 if dst_port not in slice.rules["allowed_ports"]:
-                    logging.info(f"[ERROR] Port {dst_port} not allowed for slice {slice.name}")
+                    logging.info(f"[ERROR] Port {dst_port} not allowed for slice {slice.id}")
                 elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
                     conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
             if slice.rules["allowed_services"]:
                 dst_ip = l3_packet.dst if not invert_src_dst else l3_packet.src  # type: ignore
                 src_ip = l3_packet.src if not invert_src_dst else l3_packet.dst  # type: ignore
                 if dst_ip not in slice.rules["allowed_services"] and src_ip not in slice.rules["allowed_services"]:
-                    logging.info(f"[ERROR] IP {dst_ip} not allowed for slice {slice.name}")
+                    logging.info(f"[ERROR] IP {dst_ip} not allowed for slice {slice.id}")
                 else:
                     dst_port = l4_packet.dst_port if not invert_src_dst else l4_packet.src_port  # type: ignore
                     src_port = l4_packet.src_port if not invert_src_dst else l4_packet.dst_port  # type: ignore
                     if src_ip in slice.rules["allowed_services"]:
                         allowed_ports = slice.rules["allowed_services"][src_ip]
                         if src_port not in allowed_ports:
-                            logging.info(f"[ERROR] SRC Port {src_port} not allowed for slice {slice.name}")
+                            logging.info(f"[ERROR] SRC Port {src_port} not allowed for slice {slice.id}")
                         elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
                             conditions.update({("udp_src" if pkt_protocol == Protocol.UDP else "tcp_src"): src_port})
                             conditions.update({"eth_src": eth_header.src if not invert_src_dst else eth_header.dst})  # type: ignore
                     if dst_ip in slice.rules["allowed_services"]:
                         allowed_ports = slice.rules["allowed_services"][dst_ip]
                         if dst_port not in allowed_ports:
-                            logging.info(f"[ERROR] DST Port {dst_port} not allowed for slice {slice.name}")
+                            logging.info(f"[ERROR] DST Port {dst_port} not allowed for slice {slice.id}")
                         elif pkt_protocol in [Protocol.UDP, Protocol.TCP]:
                             conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
         logging.info(f"[_get_match_conditions_for_slice] Match conditions for slice {Slice.get_slice_id(slice)}: {json.dumps(conditions, indent=4)}")

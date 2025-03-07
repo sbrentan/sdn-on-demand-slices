@@ -49,6 +49,7 @@ class GUIController(ControllerBase):
         context.update({
             "base_url": GUI_BASE_URL,
             "Paths": GuiPaths,
+            "ApiPaths": ApiPaths,
         })
         render = template.render(context)
         return Response(body=render, content_type="text/html")

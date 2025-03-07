@@ -114,7 +114,7 @@ class QueueUtils:
                 queues = []
                 if connection_id in network.link_to_slice_dict and len(network.link_to_slice_dict[connection_id]) > 0:
                     for queue_id, slice in enumerate(network.link_to_slice_dict[connection_id]):
-                        logging.info(f"Creating queue for slice {slice.name} on switch {switch.dp.id} port {port_name}: {queue_id}")
+                        logging.info(f"Creating queue for slice {slice.id} on switch {switch.dp.id} port {port_name}: {queue_id}")
                         queues.append(Queue(
                             switch=switch,
                             connection=connection,

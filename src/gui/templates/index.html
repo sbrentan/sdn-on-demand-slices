@@ -18,6 +18,11 @@
         <script src="{{ Paths.STATIC('scripts/script.js') }}"></script>
     </head>
     <body>
+        <div id="request-indicator" class="spinner-overlay">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        </div>
         <h1 id="title" class="display-5 text-center my-4">SDN On-Demand Slices</h1>
         <div class="d-flex justify-content-center mt-3 mb-3">
             <button type="button" class="btn btn-light mx-2">Add Slice</button>
@@ -57,5 +62,13 @@
         menu.classList.add('closed');
         menu.classList.remove('opened');
         document.querySelector('#details-container').innerHTML = '';
+    });
+
+    document.addEventListener('htmx:configRequest', function(event) {
+        document.getElementById('request-indicator').classList.add('show');
+    });
+
+    document.addEventListener('htmx:afterRequest', function(event) {
+        document.getElementById('request-indicator').classList.remove('show');
     });
 </script>

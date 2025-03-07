@@ -32,26 +32,29 @@ class APIController(ControllerBase):
         slice_links = {}
         link_to_slice_dict = SliceUtils.get_link_to_slice_dict(skip_active_slices=False)
         for connection in self.network.connections:
+            if connection.link_id not in link_to_slice_dict:
+                continue
             for slice in link_to_slice_dict[connection.link_id]:
-                if slice.name not in slice_links:
-                    slice_links[slice.name] = []
-                slice_links[slice.name].append(connection.link_id)
+                if slice.id not in slice_links:
+                    slice_links[slice.id] = []
+                slice_links[slice.id].append(connection.link_id)
         for slice in self.network.slices:
             slice_dict = slice.to_dict()
-            slice_dict['links'] = slice_links[slice.name] if slice.name in slice_links else []
+            slice_dict['links'] = slice_links[slice.id] if slice.id in slice_links else []
             slices_dict.append(slice_dict)
         return self._json_response(data=slices_dict)
 
     @route('get_slice', ApiPaths.SLICE(), methods=['GET'])
     def get_slice(self, req, slice_id, **kwargs):
         """REST endpoint to get the details of a specific slice."""
-        slice = [s for s in self.network.slices if s.name == slice_id]
+        slice = [s for s in self.network.slices if s.id == slice_id]
         if not slice:
             return self._json_response(status="404 Not Found")
         slice_dict = slice[0].to_dict()
         slice_links = []
+        link_to_slice_dict = SliceUtils.get_link_to_slice_dict(skip_active_slices=False)
         for connection in self.network.connections:
-            if slice[0] in self.network.link_to_slice_dict[connection.link_id]:
+            if slice[0] in link_to_slice_dict[connection.link_id]:
                 slice_links.append(connection.link_id)
         slice_dict['links'] = slice_links
         return self._json_response(data=slice_dict)
@@ -64,7 +67,7 @@ class APIController(ControllerBase):
         except Exception as e:
             logging.error(f"Error creating slice: {e}")
             return self._json_response(status="400 Bad Request")
-        if [s for s in self.network.slices if s.name == slice_data["name"]]:
+        if [s for s in self.network.slices if s.id == slice_data["id"]]:
             logging.error(f"Error creating slice {slice_data['name']}: already exists")
             return self._json_response(status="409 Conflict")
         self.network.slices.append(Slice.from_dict(slice_data))
@@ -79,32 +82,27 @@ class APIController(ControllerBase):
         except Exception as e:
             logging.error(f"Error updating slice: {e}")
             return self._json_response(status="400 Bad Request")
-        slice_match = [s for s in self.network.slices if s.name == slice_id]
+        slice_match = [s for s in self.network.slices if s.id == slice_id]
         if not slice_match:
             logging.error(f"Error updating slice {slice_data['name']}: not found")
             return self._json_response(status="404 Not Found")
         slice_match[0].update_from_dict(slice_data)
         return self._json_response(status="200 OK", data=slice_match[0].to_dict())
 
-    @route('delete_slice', ApiPaths.SLICES(), methods=['DELETE'])
-    def delete_slice(self, req, **kwargs):
+    @route('delete_slice', ApiPaths.SLICE(), methods=['DELETE'])
+    def delete_slice(self, req, slice_id, **kwargs):
         """REST endpoint to delete a slice."""
-        try:
-            slice_id = json.loads(req.body)["id"]
-        except Exception as e:
-            logging.error(f"Error deleting slice: {e}")
-            return self._json_response(status="400 Bad Request")
-        slice_match = [s for s in self.network.slices if s.name == slice_id]
+        slice_match = [s for s in self.network.slices if s.id == slice_id]
         if not slice_match:
             logging.error(f"Error deleting slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
-        self.network.slices.remove(slice_match[0])
+        self.slices_manager.delete_slice(slice_match[0])
         return self._json_response(status="204 No Content")
 
-    @route('activate_slice', ApiPaths.ACTIVATE_SLICE(), methods=['GET'])
+    @route('activate_slice', ApiPaths.ACTIVATE_SLICE(), methods=['POST'])
     def activate_slice(self, req, slice_id, **kwargs):
         """REST endpoint to activate a slice."""
-        slice_match = [s for s in self.network.slices if s.name == slice_id]
+        slice_match = [s for s in self.network.slices if s.id == slice_id]
         if not slice_match:
             logging.error(f"Error activating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
@@ -112,10 +110,10 @@ class APIController(ControllerBase):
         self.slices_manager.enable_slice(slice)
         return self._json_response(status="200 OK")
 
-    @route('deactivate_slice', ApiPaths.DEACTIVATE_SLICE(), methods=['GET'])
+    @route('deactivate_slice', ApiPaths.DEACTIVATE_SLICE(), methods=['POST'])
     def deactivate_slice(self, req, slice_id, **kwargs):
         """REST endpoint to deactivate a slice."""
-        slice_match = [s for s in self.network.slices if s.name == slice_id]
+        slice_match = [s for s in self.network.slices if s.id == slice_id]
         if not slice_match:
             logging.error(f"Error deactivating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")

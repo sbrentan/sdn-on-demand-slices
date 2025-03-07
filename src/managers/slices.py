@@ -16,16 +16,16 @@ class SlicesManager:
     
         # TODO: read from file ???
         self.network.slices = [
-            Slice(name="slice1", switches=[S[0], S[1], S[3]], hosts=[H[0], H[2]], min_rate=9000000, max_rate=9000000, rules={
+            Slice(id="slice1", switches=[S[0], S[1], S[3]], hosts=[H[0], H[2]], min_rate=9000000, max_rate=9000000, rules={
                 "allowed_services": {
                     "10.0.0.3": [9999, 9998],
                 },
                 "allowed_protocols": [Protocol.UDP.value],
             }),
-            # Slice(name="slice2", switches=["s1", "s3", "s4"], hosts=["h2", "h4"], bandwidth=1000, rules={
+            # Slice(id="slice2", switches=["s1", "s3", "s4"], hosts=["h2", "h4"], bandwidth=1000, rules={
             #     "allowed_protocols": [Protocol.TCP.value],
             # }),
-            Slice(name="slice3", switches=[S[0], S[2], S[3]], hosts=[H[0], H[1], H[2], H[3]], min_rate=1000, max_rate=1000, rules={
+            Slice(id="slice3", switches=[S[0], S[2], S[3]], hosts=[H[0], H[1], H[2], H[3]], min_rate=1000, max_rate=1000, rules={
                 "allowed_protocols": [Protocol.ICMP.value],
             }),
         ]
@@ -45,23 +45,29 @@ class SlicesManager:
     def enable_slice(self, slice: Slice):
         slice.active = True
         self._reset_switches_for_slice(slice)
+        self.init_slices()
 
     def disable_slice(self, slice: Slice):
         slice.active = False
         self._reset_switches_for_slice(slice)
+        self.init_slices()
+
+    def delete_slice(self, slice: Slice):
+        self._reset_switches_for_slice(slice)
+        self.network.slices.remove(slice)
+        self.init_slices()
 
     def _reset_switches_for_slice(self, slice: Slice):
         link_to_slice_dict = SliceUtils.get_link_to_slice_dict(skip_active_slices=False)
         affected_switches = {}
         for connection in self.network.connections:
             connection_id = Connection.get_link_id(connection)
-            if slice.name in [s.name for s in link_to_slice_dict[connection_id]]:
+            if slice.id in [s.id for s in link_to_slice_dict[connection_id]]:
                 if connection.src[1].node_type == NodeType.SWITCH:
                     affected_switches[connection.src[1].node_id] = connection.src[1].node_ref
                 if connection.dst[1].node_type == NodeType.SWITCH:
                     affected_switches[connection.dst[1].node_id] = connection.dst[1].node_ref
         logging.info(f"Affected switches: {affected_switches}")
-        self.init_slices()
         for switch in affected_switches.values():
             QueueUtils.delete_queues(switch.dp.id)
             PacketUtils.delete_flows(switch)

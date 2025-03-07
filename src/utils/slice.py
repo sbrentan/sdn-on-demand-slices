@@ -127,21 +127,24 @@ class SliceUtils:
     
     @staticmethod
     def get_link_to_slice_dict(skip_active_slices=True) -> dict:
-        link_to_slice_dict = {}
         network = Network.get_instance()
+
+        link_to_slice_dict = {}
+        for connection in network.connections:
+            connection_id = Connection.get_link_id(connection)
+            link_to_slice_dict[connection_id] = []
+
         for slice in network.slices:
             if skip_active_slices and not slice.active:
                 continue
             for connection in network.connections:
                 connection_id = Connection.get_link_id(connection)
-                if connection_id not in link_to_slice_dict:
-                    link_to_slice_dict[connection_id] = []
                 if connection.is_host_connection:
                     if connection.src[1].ref_id in slice.hosts:
-                        if slice.name not in [s.name for s in link_to_slice_dict[connection_id]]:
+                        if slice.id not in [s.id for s in link_to_slice_dict[connection_id]]:
                             link_to_slice_dict[connection_id].append(slice)
                 elif connection.src[1].ref_id in slice.switches and connection.dst[1].ref_id in slice.switches:
-                    if slice.name not in [s.name for s in link_to_slice_dict[connection_id]]:
+                    if slice.id not in [s.id for s in link_to_slice_dict[connection_id]]:
                         link_to_slice_dict[connection_id].append(slice)
         return link_to_slice_dict
 

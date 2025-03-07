@@ -3,6 +3,8 @@ const GUI_BASE_URL = 'http://localhost:8086/gui/';
 
 /* ---------------------- Global variable ---------------------- */
 
+const DISABLED_COLOR = "#dc3545";
+const ENABLED_COLOR = "#28a745";
 const OUTLINE_COLOR = "#FF6347";
 const LINK_COLOR = "#aaa";
 const NODE_SIZE = 35;
@@ -31,11 +33,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         li.className = "list-group-item d-flex align-items-center";
         const span = document.createElement("span");
         span.className = "mr-2 slice-color"
-        span.style.backgroundColor = getRandomColor();
+        span.style.backgroundColor = slice.active ? ENABLED_COLOR : DISABLED_COLOR;
         li.appendChild(span);
         const sliceText = document.createElement("span");
         sliceText.className = "slice-text";
-        sliceText.textContent = `${slice.name} (${slice.min_rate} - ${slice.max_rate})`;
+        sliceText.textContent = `${slice.name} [${slice.id}]`;
         li.appendChild(sliceText);
         li.dataset.index = index;
         sliceList.appendChild(li);
@@ -47,17 +49,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     renderGraph(graph_data, slices);
 });
-
-function getRandomColor() {
-
-    const colors = [
-        "#ffbe0b",
-        "#fb5607",
-        "#3590f3"
-    ];
-
-    return colors[Math.floor(Math.random() * colors.length)];
-}
 
 async function fetchMenuDetails (url) {
     const menu = document.getElementById('details-menu');
@@ -72,22 +63,40 @@ async function fetchMenuDetails (url) {
 
         // Insert the response into the target element
         target.innerHTML = await response.text();
+
+        // Restore htmx behavior
+        htmx.process(target);
+
+        addAfterRequestEventListeners(target);
     } catch (error) {
         console.error('Fetch Error:', error);
         target.innerHTML = '<p>Error loading content.</p>';
     }
 }
 
+function addAfterRequestEventListeners(target) {
+    let edit_buttons = target.querySelectorAll('.slice-actions button');
+    edit_buttons.forEach(button => {
+        button.addEventListener('htmx:afterRequest', function(event) {
+            let response = event.detail.xhr;
+            if (response.status === 200 || response.status === 204) {
+                window.location.href = window.location.href;
+            } else {
+                alert('An error occurred while processing your request.');
+            }
+        });
+    });
+}
+
 function highlightSlice(component, slice) {
-    const sliceColor = component.querySelector(".slice-color").style.backgroundColor;
     let node = d3.selectAll("image");
     let link = d3.selectAll("line");
 
-    outlineFilter.select("feFlood").attr("flood-color", sliceColor);
+    outlineFilter.select("feFlood").attr("flood-color", OUTLINE_COLOR);
     node.attr("filter", d => slice.nodes.includes(d.id) ? "url(#outlineFilter)" : null);
 
     // line stroke 4 if link is in slice, else 2
-    link.attr("stroke", d => slice.links.includes(d.id) ? sliceColor : LINK_COLOR).attr("stroke-width", d => slice.links.includes(d.id) ? 4 : 2);
+    link.attr("stroke", d => slice.links.includes(d.id) ? OUTLINE_COLOR : LINK_COLOR).attr("stroke-width", d => slice.links.includes(d.id) ? 4 : 2);
 }
 
 function deselectAll() {
@@ -180,8 +189,6 @@ function renderGraph(data, slices) {
         .on("click", function(event, d) {
             event.stopPropagation();
 
-            console.log("Clicked link:", d);
-
             deselectAll();
 
             // Highlight the clicked link
@@ -203,8 +210,6 @@ function renderGraph(data, slices) {
         .call(drag(simulation))
         .on("click", async function(event, d) {
             event.stopPropagation();
-
-            console.log("Clicked node:", d);
 
             deselectAll();
 
@@ -248,16 +253,14 @@ function renderGraph(data, slices) {
     sliceList.addEventListener("click", async function (event) {
         let target = event.target;
         if (event.target.tagName === "SPAN") target = event.target.parentElement;
-        console.log(target.dataset.index);
         const selectedSlice = slices[target.dataset.index];
-        console.log(selectedSlice);
         if (selectedSlice !== undefined) {
             deselectAll();
 
             target.classList.toggle("selected");
             highlightSlice(target, selectedSlice);
 
-            await fetchMenuDetails(`/gui/menu/details/slice/${selectedSlice.name}`);
+            await fetchMenuDetails(`/gui/menu/details/slice/${selectedSlice.id}`);
         }
     });
 }
@@ -316,7 +319,6 @@ function saveLayout() {
             target: link.target.id
         }));
         const layoutJSON = JSON.stringify({ nodes: layout, links });
-        // console.log(layoutJSON);
         setCookie("networkLayout", layoutJSON, 7); // Save for 7 days
         alert("Layout saved!");
     }
@@ -367,7 +369,6 @@ async function fetchData(endpoint, method = 'GET', body = null) {
         }
 
         response_json = await response.json();
-        // console.log('Response json:', JSON.stringify(response_json, null, 2));
         return response_json
     } catch (error) {
         console.error(`Failed to fetch data from ${endpoint}:`, error);

@@ -45,7 +45,7 @@ class Protocol(Enum):
 @dataclass
 class Slice:
 
-    name: str
+    id: str
     rules: dict
     switches: List[str]
     hosts: List[str]
@@ -53,10 +53,12 @@ class Slice:
     min_rate: Optional[int] = None  # In bps
     max_rate: Optional[int] = None  # In bps
 
+    name: Optional[str] = None
+
     @staticmethod
     def get_slice_id(slice: Optional[Slice] = None) -> str:
         if slice:
-            return slice.name
+            return slice.id
         raise ValueError("No slice provided")
 
     def is_protocol_valid(self, pkt_protocol: Protocol) -> bool:
@@ -88,6 +90,8 @@ class Slice:
         return port in self.rules["allowed_ports"]
 
     def __post_init__(self):
+        if not self.name:
+            self.name = self.id
         # Validate rules
         if "allowed_protocols" not in self.rules:
             self.rules["allowed_protocols"] = None  # If none, no rule is enforced
@@ -116,12 +120,12 @@ class Slice:
                     if not isinstance(port, int):
                         raise ValueError("Invalid port")
         
-        # if self.name != Slice.get_slice_id():
         if not any([self.rules[r] for r in self.rules]):
             raise ValueError("No rules specified")
 
     def to_dict(self) -> dict:
         return {
+            "id": self.id,
             "name": self.name,
             "rules": self.rules,
             "nodes": self.switches + self.hosts,
@@ -131,7 +135,7 @@ class Slice:
         }
     
     def update_from_dict(self, data: dict):
-        # TODO: is slice.name the actual slice id? or should slice_id be introduced?
+        self.name = data["name"] if "name" in data else self.name
         self.rules = data["rules"] if "rules" in data else self.rules
         self.switches = [n for n in data["nodes"] if n.startswith("s")] if "nodes" in data else self.switches # TODO: change
         self.hosts = [n for n in data["nodes"] if n.startswith("h")] if "nodes" in data else self.hosts # TODO: change
@@ -142,8 +146,8 @@ class Slice:
 
     @staticmethod
     def from_dict(data: dict) -> Slice:
-        return Slice(
-            name=data["name"],
+        slice = Slice(
+            id=data["id"],
             rules=data["rules"],
             switches=[n for n in data["nodes"] if n.startswith("s")], # TODO: change
             hosts=[n for n in data["nodes"] if n.startswith("h")], # TODO: change
@@ -151,9 +155,12 @@ class Slice:
             min_rate=data.get("min_rate"),
             max_rate=data.get("max_rate")
         )
+        if "name" in data:
+            slice.name = data["name"]
+        return slice
     
     def __repr__(self) -> str:
-        return f"Slice({self.name}) - Switches: {self.switches} - Hosts: {self.hosts}"
+        return f"Slice({self.id}) - Switches: {self.switches} - Hosts: {self.hosts}"
     
     def __str__(self) -> str:
         return self.__repr__()
@@ -161,7 +168,7 @@ class Slice:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Slice):
             return NotImplemented
-        return self.name == other.name
+        return self.id == other.id
 
     def __in__(self, other: object) -> bool:
         if not isinstance(other, List):

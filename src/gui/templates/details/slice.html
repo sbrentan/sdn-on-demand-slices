@@ -1,13 +1,20 @@
 <div class="container my-4">
-    <h3>Slice Details</h3>
+    <h3>
+        Slice [{{ slice.id }}]
+    </h3>
+    <h6 style="padding: 0 10px;">
+        {% if slice.active %}
+        <span class="mr-2 slice-color" style="background-color: rgb(40, 167, 69); "></span><span style="color: rgb(40, 167, 69);">enabled</span>
+        {% else %}
+        <span class="mr-2 slice-color" style="background-color: rgb(220, 53, 69);"></span><span style="color: rgb(220, 53, 69);">disabled</span>
+        {% endif %}
+    </h6>
     <hr>
     <div class="row mb-3">
         <div class="col-md-12">
             <div class="form-group">
                 <label for="slice_name" class="form-label">Name</label>
                 <input type="text" class="form-control" id="slice_name" value="{{ slice.name }}" readonly>
-                <label for="slice_status" class="form-label">Status</label>
-                <input type="text" class="form-control" id="slice_status" value="{{ 'Enabled' if slice.active else 'Disabled' }}" readonly>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
@@ -60,20 +67,34 @@
     <div class="row mb-3">
         <div class="col-md-12">
             <h5>Actions</h5>
-            <div class="row mb-2">
-                <div class="col-md-6">
+            <div class="row slice-actions" style="padding: 0 10px;">
+                <div class="col-md-4" style="padding: 0 3px;">
                     <button type="button" class="btn btn-primary w-100" title="Edit">Edit <i class="bi bi-pencil-fill"></i></button>
                 </div>
-                <div class="col-md-6">
-                    <button type="button" class="btn btn-danger w-100" title="Delete">Delete <i class="bi bi-trash-fill"></i></button>
+                <div class="col-md-4" style="padding: 0 3px;">
+                    {% if slice.active %}
+                    <button type="button" class="btn btn-warning w-100" title="Disable"
+                            hx-post="{{ ApiPaths.DEACTIVATE_SLICE(slice.id) }}"
+                            hx-indicator="#request-indicator" hx-trigger="click"
+                    >
+                        Disable <i class="bi bi-lock-fill"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-success w-100" title="Enable"
+                            hx-post="{{ ApiPaths.ACTIVATE_SLICE(slice.id) }}"
+                            hx-indicator="#request-indicator" hx-trigger="click"
+                    >
+                        Enable <i class="bi bi-unlock-fill"></i>
+                    </button>
+                    {% endif %}
                 </div>
-            </div>
-            <div class="row">
-                <div class="col-md-6">
-                    <button type="button" class="btn btn-success w-100" title="Enable">Enable <i class="bi bi-unlock-fill"></i></button>
-                </div>
-                <div class="col-md-6">
-                    <button type="button" class="btn btn-warning w-100 text-white" title="Disable">Disable <i class="bi bi-lock-fill"></i></button>
+                <div class="col-md-4" style="padding: 0 3px;">
+                    <button type="button" class="btn btn-danger w-100" title="Delete"
+                            hx-delete="{{ ApiPaths.SLICE(slice.id) }}"
+                            hx-indicator="#request-indicator" hx-trigger="click"
+                    >
+                        Delete <i class="bi bi-trash-fill"></i>
+                    </button>
                 </div>
             </div>
         </div>
