@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional, List, Any
 from enum import Enum
 from dataclasses import dataclass
+from typing import Optional, List, Any, Dict, Callable
 
 from ryu.topology.switches import Switch, Link, Host, Port
+
+from .slice import Slice
 
 # switches -> [Switch({dp: any, ports: []}), ...]
 # links -> [{src: Port, dst: Port}, ...]
@@ -129,13 +131,60 @@ class Connection:
         return self.__repr__()
 
 
-@dataclass
 class Network:
+    __instance = None
 
+    switches: Dict[str, Switch]
+    links: Dict[str, Link]
+    hosts: Dict[str, Host]
+    nodes: Dict[str, Node]
     connections: List[Connection]
 
+    update_events: List[Callable] = []
+
+    slices: List[Slice] = []
+    node_connections: Dict[str, List[Connection]] = {}
+    link_to_slice_dict: Dict[str, List[Slice]] = {}
+
+    def __init__(self, switches=None, links=None, hosts=None, connections=None, nodes=None):
+        self.switches = switches if switches else {}
+        self.links = links if links else {}
+        self.hosts = hosts if hosts else {}
+        self.connections = connections if connections else []
+        self.nodes = nodes if nodes else {}
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "switches": {k: v.to_dict() for k, v in self.switches.items()},
+            "links": {k: v.to_dict() for k, v in self.links.items()},
+            "hosts": {k: v.to_dict() for k, v in self.hosts.items()}
+        }
+    
+    def add_update_event(self, event: Callable):
+        logging.info(f"Adding update event: {event}")
+        self.update_events.append(event)
+
+    @classmethod
+    def get_instance(cls) -> Network:
+        if cls.__instance is None:
+            raise ValueError("Network instance not initialized")
+        return cls.__instance
+
+    def __new__(cls, **kwargs) -> Network:
+        if cls.__instance is None:
+            cls.__instance = super().__new__(cls, **kwargs)
+        else:
+            logging.info(f"Reusing existing network instance ({len(cls.__instance.update_events)} events)")
+            for key, value in kwargs.items():
+                setattr(cls.__instance, key, value)
+            for event in cls.__instance.update_events:
+                logging.info(f"Calling update event: {event.__name__}")
+                event()
+        logging.debug(f"Network instance address: {id(cls.__instance)}")
+        return cls.__instance
+
     def __repr__(self) -> str:
-        return f"Network({self.connections})"
+        return f"Network({len(self.connections)} connections)"
 
     def __str__(self) -> str:
         return self.__repr__()

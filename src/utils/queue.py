@@ -1,61 +1,19 @@
 import httpx, json, time, logging
-from dataclasses import dataclass
-from typing import Optional, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 from ryu.lib import dpid as dpid_lib
 from ryu.lib.packet import ethernet
 from ryu.lib.packet.packet import Packet
-from ryu.lib.ovs.bridge import OVSBridge
-from ryu.cfg import CONF
 
-from utils.topology import Connection, Switch, Network, Node, TopologyUtils
-from utils.slice import Slice
-from utils.constants import CONTROLLER_IP, CONTROLLER_PORT, OVSDB_ADDR, NETWORK_MAX_RATE
-
-@dataclass
-class Queue:
-
-    switch: Switch
-    connection: Connection
-    queue_id: int
-    min_rate: Optional[int] = None
-    max_rate: Optional[int] = None
-    slice: Optional[Slice] = None
-
-    def __post_init__(self):
-        if not self.max_rate:
-            self.max_rate = NETWORK_MAX_RATE
-
-    def determine_out_port(self, dpid: int) -> int:
-        out_port = self.connection.src[0].port_no if self.connection.src[0].dpid == dpid else self.connection.dst[0].port_no
-        return out_port
-
-    # @staticmethod
-    # def get_default_queue(switch: Switch, connection: Any, min_rate: int = 100, max_rate: int = 100):
-    #     return Queue(switch=switch, connection=connection, queue_id=0, min_rate=min_rate, max_rate=max_rate)
-    
-    def to_queue_dict(self):
-        # TODO: change this if OVSBridge is used instead of REST API
-        queue_dict = {}
-        if self.min_rate is not None:
-            queue_dict["min_rate"] = str(self.min_rate)
-        if self.max_rate is not None:
-            queue_dict["max_rate"] = str(self.max_rate)
-        return queue_dict
+from .topology import TopologyUtils
+from common import Connection, Network, Node, Slice, Queue
+from common.constants import CONTROLLER_IP, CONTROLLER_PORT, OVSDB_ADDR, NETWORK_MAX_RATE
 
 
 class QueueUtils:
 
-    link_to_slice_dict: Dict[str, List[Slice]]
-    node_connections: Dict[str, List[Connection]]
-    network: Optional[Network]
-    
-    def __init__(self, network: Optional[Network], link_to_slice_dict: dict, node_connections: dict):
-        self.link_to_slice_dict = link_to_slice_dict
-        self.node_connections = node_connections
-        self.network = network
-
-    def get_queues_for_slices(self, switch_id: str, slices: List[Slice], in_connection: Connection, pkt: Packet) -> Dict[str, Queue]:
+    @staticmethod
+    def get_queues_for_slices(switch_id: str, slices: List[Slice], in_connection: Connection, pkt: Packet) -> Dict[str, Queue]:
         """
         Get the links that are part of the slices, excluding the in_connection
         If there are no slices, assuming the incoming packet is not part of any slice
@@ -76,7 +34,8 @@ class QueueUtils:
         Returns:
             Dict[str, Queue]: Dict of outgoing queues for the slices
         """
-        connections = self.node_connections.get(switch_id, [])
+        newtork = Network.get_instance()
+        connections = newtork.node_connections.get(switch_id, [])
         logging.info(f"[get_links_for_slices] Switch {switch_id} connections: {connections}")
         outgoing_queues: Dict[str, Queue] = {}
         eth_dst = pkt.get_protocol(ethernet.ethernet).dst # type: ignore
@@ -107,7 +66,7 @@ class QueueUtils:
                 logging.info(f"[get_links_for_slices] Host connection found: {link_id}")
                 return {link_id: outgoing_queues[link_id]}
                 
-            # if not slices and not self.link_to_slice_dict[link_id]:
+            # if not slices and not network.link_to_slice_dict[link_id]:
             #     # If the packet does not belong to any slice and the connection does not have any slice
             #     #     flood the packet to this connection in FLOODING mode in default queue
             #     logging.info(f"[get_links_for_slices] No slice found for link: {link_id}, setting queue_id to 0")
@@ -119,12 +78,16 @@ class QueueUtils:
                 
         return outgoing_queues
 
-    def init_queues(self):
+    @staticmethod
+    def init_queues():
+
+        # TODO: edit queues based on previous existing queues (is a new switch is added, edit only the connected switches queues)
         
-        if self.network is None:
+        network = Network.get_instance()
+        if network is None:
             logging.info("[init_queues] Network is not defined")
             return
-        for connection in self.network.connections:
+        for connection in network.connections:
             src_dpid = connection.src[0].dpid
             dst_dpid = connection.dst[0].dpid
             src_port = connection.src[0].name
@@ -134,23 +97,23 @@ class QueueUtils:
             # TODO: change the delete_rules logic: unique url DELETE /qos/rules/all/all to delete all QoS rules ??
 
             connection_id = Connection.get_link_id(connection)
-            # if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 1:
+            # if connection_id in network.link_to_slice_dict and len(network.link_to_slice_dict[connection_id]) > 1:
                 # TODO: manage the case when a previous active slice is removed and the queues should be deleted anyway
             # status, result = QueueUtils.delete_queues(src_dpid, src_port)
             # logging.info(f"QueueUtils.delete_queues for connection ({connection}) src {src_dpid} {src_port}: {status} {result}")
             # status, result = QueueUtils.delete_queues(dst_dpid, dst_port)
             # logging.info(f"QueueUtils.delete_queues for connection ({connection}) dst {dst_dpid} {dst_port}: {status} {result}")
 
-        for _, switch in TopologyUtils.switches.items():
+        for _, switch in network.switches.items():
             node_id = Node.get_node_id(switch)
-            switch_connections = self.node_connections.get(node_id, [])
+            switch_connections = network.node_connections.get(node_id, [])
             for connection in switch_connections:
                 port_name = connection.src[0].name if connection.src[0].dpid == switch.dp.id else connection.dst[0].name
                 connection_id = Connection.get_link_id(connection)
 
                 queues = []
-                if connection_id in self.link_to_slice_dict and len(self.link_to_slice_dict[connection_id]) > 0:
-                    for queue_id, slice in enumerate(self.link_to_slice_dict[connection_id]):
+                if connection_id in network.link_to_slice_dict and len(network.link_to_slice_dict[connection_id]) > 0:
+                    for queue_id, slice in enumerate(network.link_to_slice_dict[connection_id]):
                         logging.info(f"Creating queue for slice {slice.name} on switch {switch.dp.id} port {port_name}: {queue_id}")
                         queues.append(Queue(
                             switch=switch,
@@ -169,7 +132,7 @@ class QueueUtils:
                 #     queues.append(Queue.get_default_queue(switch, connection, min_rate=DEFAULT_QUEUE_MIN_RATE, max_rate=DEFAULT_QUEUE_MAX_RATE))
 
                 logging.info(f"Creating queues for switch {switch.dp.id} on port {port_name}")
-                status, result = self.create_queues(switch.dp.id, port_name, queues)
+                status, result = QueueUtils.create_queues(switch.dp.id, port_name, queues)
                 logging.info(f"create_queues for switch {switch.dp.id} port {port_name}: {status} {result}")
 
                 connection.queues = queues
@@ -243,20 +206,22 @@ class QueueUtils:
         
         return None, ""
 
-    def delete_queues(self, dpid, port_name) -> Tuple:
+    @staticmethod
+    def delete_queues(dpid, port_name) -> Tuple:
         dpid_str = dpid_lib.dpid_to_str(dpid)
         url = f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}/qos/queue/{dpid_str}"
 
         # Prepare the data to be sent in the DELETE request
-        data = {"port_name": port_name.decode("utf-8")}
+        # data = {"port_name": port_name.decode("utf-8")}
         
-        logging.info(f"URL: {url}, Data: {data}")
+        # logging.info(f"URL: {url}, Data: {data}")
         
         try:
+            logging.info(f"Deleting queues for switch {dpid}")
             response = httpx.request(
                 method="DELETE",
                 url=url,
-                data=json.dumps(data) #type: ignore
+                # data=json.dumps(data) #type: ignore
             )
             response_status = response.status_code  # Get the status code of the response
             response_data = response.text  # Read and decode the response

@@ -1,6 +1,11 @@
 #!/bin/bash
 
-module_path="/comnetsemu/app/sdn-on-demand-slices"
+cd "$(dirname "$0")/src"
+
+module_path="$(pwd)"
+
+echo "Module path: $module_path"
+
 if [[ ":$PYTHONPATH:" != *":$module_path:"* ]]; then
     export PYTHONPATH="${PYTHONPATH:+"$PYTHONPATH:"}$module_path"
     echo $PYTHONPATH
@@ -23,7 +28,7 @@ ryu-manager --observe-links ryu_app.py > "$log_file" 2>&1 &
 
 # echo "Ryu controller started with PID: $ryu_manager_pid"
 
-sleep 5
+sleep 2
 
 echo "Starting Mininet network..."
 sudo python3 network.py
