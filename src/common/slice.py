@@ -141,10 +141,10 @@ class Slice:
         self.rules = data["rules"] if "rules" in data else self.rules
         self.switches = [n for n in data["nodes"] if n.startswith("s")] if "nodes" in data else self.switches # TODO: change
         self.hosts = [n for n in data["nodes"] if n.startswith("h")] if "nodes" in data else self.hosts # TODO: change
-        self.active = bool(data["active"]) if "active" in data else self.active,
+        self.active = bool(data["active"]) if "active" in data else self.active
         self.min_rate = data["min_rate"] if "min_rate" in data else self.min_rate
-        self.max_rate = data["max_rate"] if "max_rate" in data else self.max_rate 
-        # TODO: call self.__post_init__() to validate rules??    
+        self.max_rate = data["max_rate"] if "max_rate" in data else self.max_rate
+        # TODO: call self.__post_init__() to validate rules??
 
     @staticmethod
     def from_dict(data: dict) -> Slice:
