@@ -1,4 +1,4 @@
-<div class="container my-4">
+<div class="container my-4" id="slice-details">
     <h3>
         Slice [{{ slice.id }}]
     </h3>
@@ -12,20 +12,20 @@
     <hr>
     <div class="row mb-3">
         <div class="col-md-12">
-            <div class="form-group">
+            <div class="form-group details-form">
                 <label for="slice_name" class="form-label">Name</label>
-                <input type="text" class="form-control" id="slice_name" value="{{ slice.name }}" readonly>
+                <input type="text" class="form-control editable" id="slice_name" name="name" value="{{ slice.name }}" readonly>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
                             <label for="min_rate" class="form-label">Min Rate</label>
-                            <input type="text" class="form-control" id="min_rate" value="{{ slice.min_rate }}" readonly>
+                            <input type="text" class="form-control editable" id="min_rate" name="min_rate" value="{{ slice.min_rate }}" readonly>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
                             <label for="max_rate" class="form-label">Max Rate</label>
-                            <input type="text" class="form-control" id="max_rate" value="{{ slice.max_rate }}" readonly>
+                            <input type="text" class="form-control editable" id="max_rate" name="max_rate" value="{{ slice.max_rate }}" readonly>
                         </div>
                     </div>
                 </div>
@@ -69,7 +69,7 @@
             <h5>Actions</h5>
             <div class="row slice-actions" style="padding: 0 10px;">
                 <div class="col-md-4" style="padding: 0 3px;">
-                    <button type="button" class="btn btn-primary w-100" title="Edit">Edit <i class="bi bi-pencil-fill"></i></button>
+                    <button type="button" class="btn btn-primary w-100 confirm-btn" title="Edit">Edit</i></button>
                 </div>
                 <div class="col-md-4" style="padding: 0 3px;">
                     {% if slice.active %}
@@ -100,3 +100,15 @@
         </div>
     </div>
 </div>
+<script>
+    makeEditable("#slice-details", onconfirm = async function(data) {
+        try {
+            // TODO: check implementation
+            await fetchData("", "PUT", JSON.stringify(data), "{{ Paths.SLICE(slice.id) }}");
+            return true;
+        } catch (error) {
+            console.error("Failed to update slice details", error);
+        }
+        return false;
+    });
+</script>

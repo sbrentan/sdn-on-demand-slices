@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import json
 from typing import List, Optional
 from enum import Enum
 from dataclasses import dataclass
@@ -135,6 +135,8 @@ class Slice:
         }
     
     def update_from_dict(self, data: dict):
+        if isinstance(data, str):
+            data = json.loads(data)
         self.name = data["name"] if "name" in data else self.name
         self.rules = data["rules"] if "rules" in data else self.rules
         self.switches = [n for n in data["nodes"] if n.startswith("s")] if "nodes" in data else self.switches # TODO: change

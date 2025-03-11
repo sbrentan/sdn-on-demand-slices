@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from enum import Enum
 from dataclasses import dataclass
@@ -61,6 +62,21 @@ class Node:
         elif isinstance(node_ref, Host):
             return Node.get_host_id(node_ref.mac)
         raise ValueError(f"Unknown node type: {node_ref}")
+    
+    def to_dict(self) -> Dict[str, Any]:
+        if self.node_type == NodeType.SWITCH:
+            return {
+                "id": self.node_id,
+                "dpid": self.node_ref.dp.id,
+                "name": self.name
+            }
+        elif self.node_type == NodeType.HOST:
+            return {
+                "id": self.node_id,
+                "ip": self.node_ref.ipv4,
+                "mac": self.node_ref.mac,
+                "name": self.name
+            }
 
     def __repr__(self) -> str:
         return f"{self.node_type.value}({self.node_id})"
@@ -169,6 +185,16 @@ class Network:
         if cls.__instance is None:
             raise ValueError("Network instance not initialized")
         return cls.__instance
+    
+    def update_host_from_dict(self, host_id, host_dict):
+        host_node = [node for node in self.nodes.values() if node.node_id == host_id]
+        if not host_node:
+            raise ValueError(f"Host node not found for host: {host_id}")
+        host_node = host_node[0]
+        if isinstance(host_dict, str):
+            host_dict = json.loads(host_dict)
+        host_node.name = host_dict["name"] if "name" in host_dict else host_node.name
+        return host_node
 
     def __new__(cls, **kwargs) -> Network:
         if cls.__instance is None:

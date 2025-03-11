@@ -14,6 +14,7 @@ body {
 #network-graph {
     width: 100%;
     height: 100%;
+    transition: transform 0.3s ease;
 }
 
 #controls {
@@ -197,4 +198,29 @@ body {
 }
 .spinner-overlay.show {
     display: flex;
+}
+
+button.confirm-btn::after{
+    content: "\f4c9";
+    font-family: bootstrap-icons !important;
+    font-style: normal;
+    font-weight: normal !important;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    vertical-align: -.125em;
+    -webkit-font-smoothing: antialiased;
+    margin-left: 5px;
+}
+button.cancel-btn::after{
+    content: "\f659";
+    font-family: bootstrap-icons !important;
+    font-style: normal;
+    font-weight: normal !important;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    vertical-align: -.125em;
+    -webkit-font-smoothing: antialiased;
+    margin-left: 5px;
 }

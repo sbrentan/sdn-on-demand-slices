@@ -58,10 +58,7 @@
     close_button = document.querySelector('.close-menu-btn');
     close_button.addEventListener('click', function(event) {
         deselectAll();
-        let menu = document.querySelector('#details-menu');
-        menu.classList.add('closed');
-        menu.classList.remove('opened');
-        document.querySelector('#details-container').innerHTML = '';
+        closeDetailsMenu();
     });
 
     document.addEventListener('htmx:configRequest', function(event) {

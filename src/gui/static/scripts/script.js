@@ -54,8 +54,11 @@ async function fetchMenuDetails (url) {
     const menu = document.getElementById('details-menu');
     const target = document.getElementById('details-container');
     // add class
-    menu.classList.add('opened');
-    menu.classList.remove('closed');
+    if (menu.classList.contains('closed')) {
+        menu.classList.remove('closed');
+        menu.classList.add('opened');
+        increaseZoom(0.4);
+    }
 
     try {
         const response = await fetch(url);
@@ -68,10 +71,27 @@ async function fetchMenuDetails (url) {
         htmx.process(target);
 
         addAfterRequestEventListeners(target);
+
+        // Execute scripts in the response
+        const scripts = target.getElementsByTagName('script');
+        for (let script of scripts) {
+            const newScript = document.createElement('script');
+            newScript.textContent = script.textContent;
+            document.head.appendChild(newScript).parentNode.removeChild(newScript);
+        }
     } catch (error) {
         console.error('Fetch Error:', error);
         target.innerHTML = '<p>Error loading content.</p>';
     }
+}
+
+function closeDetailsMenu() {
+    
+    let menu = document.querySelector('#details-menu');
+    menu.classList.add('closed');
+    decreaseZoom(0.4);
+    menu.classList.remove('opened');
+    document.querySelector('#details-container').innerHTML = '';
 }
 
 function addAfterRequestEventListeners(target) {
@@ -213,6 +233,8 @@ function renderGraph(data, slices) {
 
             deselectAll();
 
+            console.log(d)
+
             // Highlight the clicked node
             outlineFilter.select("feFlood").attr("flood-color", OUTLINE_COLOR);
             d3.select(this)
@@ -229,7 +251,7 @@ function renderGraph(data, slices) {
         .append("text")
         .attr("dy", -20)
         .attr("text-anchor", "middle")
-        .text(d => d.id);
+        .text(d => d.name ? d.name : d.id);
 
     function drag(simulation) {
         return d3.drag()
@@ -286,16 +308,16 @@ function getCookie(name) {
 
 /* ----------------------- Graph Controls ----------------------- */
 
-function increaseZoom() { 
-    if (ratio < 2) {
-        ratio += 0.1;
+function increaseZoom(quantity = 0.2) { 
+    if (ratio < 3) {
+        ratio += quantity;
         document.getElementById("network-graph").style.transform = `scale(${ratio})`;
     }
 }
 
-function decreaseZoom() {
+function decreaseZoom(quantity = 0.2) {
     if (ratio > 0.5) { 
-        ratio -= 0.1;
+        ratio -= quantity;
         document.getElementById("network-graph").style.transform = `scale(${ratio})`;
     }
 }
@@ -350,7 +372,7 @@ async function loadComponent(component, targetId) {
 }
 
 // Generic function to fetch data from an endpoint
-async function fetchData(endpoint, method = 'GET', body = null) {
+async function fetchData(endpoint, method = 'GET', body = null, baseUrl = API_BASE_URL) {
     try {
         const options = {
             method,
@@ -363,7 +385,7 @@ async function fetchData(endpoint, method = 'GET', body = null) {
             options.body = JSON.stringify(body);
         }
 
-        const response = await fetch(API_BASE_URL + endpoint, options);
+        const response = await fetch(baseUrl + endpoint, options);
         if (!response.ok) {
             throw new Error(`Error: ${response.status} - ${response.statusText}`);
         }
@@ -387,8 +409,8 @@ async function createSlice(sliceData) {
 }
 
 // Update a slice
-async function updateSlice(sliceData) {
-    return await fetchData('/slices', 'PUT', sliceData);
+async function updateSlice(sliceId, sliceData) {
+    return await fetchData('/slices/' + sliceId, 'PUT', sliceData);
 }
 
 // Delete a slice
@@ -404,4 +426,85 @@ async function getNodes() {
 // Fetch links
 async function getLinks() {
     return await fetchData('/topology/links');
+}
+
+/* ----------------------- Editable Forms ----------------------- */
+
+function makeEditable(details_selector, onconfirm=undefined) {
+    let details = document.querySelector(details_selector);
+    if (!details) console.log("No details found");
+    let btn = details.querySelector('.confirm-btn');
+    if (!btn) console.log("No button found");
+    let form = details.querySelector('.details-form');
+    if (!form) console.log("No form found");
+    if (btn) {
+        btn.addEventListener('click', function() {
+            if (btn.classList.contains('editing')) {
+                // Collect updated parameters
+                const updatedParams = {};
+                form.querySelectorAll('.editable').forEach(input => {
+                    input.setAttribute('readonly', true);
+                    updatedParams[input.name] = input.value;
+                });
+
+                // Reset button state
+                btn.textContent = btn.getAttribute('initial-text');
+                btn.removeAttribute('initial-text');
+                btn.classList.remove('editing');
+                // btn.style.backgroundColor = ''; // Reset to default color
+
+                // Remove cancel button
+                const cancelButton = details.querySelector('.cancel-btn');
+                if (cancelButton) {
+                    cancelButton.remove();
+                }
+                
+                if (onconfirm) {
+                    onconfirm(updatedParams).then((result) => {
+                        if (!result)
+                            alert("Failed to save the data.");
+                        else
+                            window.location.reload();
+                    });
+                }
+            } else {
+                // Enable editing
+                btn.setAttribute('initial-text', btn.textContent);
+                form.querySelectorAll('input.editable').forEach(input => {
+                    input.removeAttribute('readonly');
+                    input.setAttribute('data-original-value', input.value);
+                });
+
+                // Change button state to confirm
+                btn.textContent = 'Confirm';
+                btn.classList.add('editing');
+                // btn.style.backgroundColor = '#ffc107'; // Change to a warning color
+
+                // Create and append cancel button
+                const cancelButton = document.createElement('button');
+                cancelButton.textContent = 'Cancel';
+                cancelButton.className = 'cancel-btn btn btn-secondary ml-2';
+                cancelButton.setAttribute('style', "width: 100%; margin: 5px 0 !important;")
+                btn.insertAdjacentElement('afterend', cancelButton);
+
+                cancelButton.addEventListener('click', function() {
+                    // Reset form inputs
+                    form.querySelectorAll('.editable').forEach(input => {
+                        input.setAttribute('readonly', true);
+                        input.value = input.getAttribute('data-original-value');
+                        input.removeAttribute('data-original-value');
+                    });
+
+                    // Reset button state
+                    btn.textContent = btn.getAttribute('initial-text');
+                    btn.removeAttribute('initial-text');
+                    btn.classList.remove('editing');
+                    btn.style.backgroundColor = ''; // Reset to default color
+
+                    // Remove cancel button
+                    cancelButton.remove();
+                });
+            }
+        });
+    }
 }

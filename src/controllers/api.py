@@ -73,18 +73,17 @@ class APIController(ControllerBase):
         self.network.slices.append(Slice.from_dict(slice_data))
         return self._json_response(status="201 Created")
 
-    @route('update_slice', ApiPaths.SLICES(), methods=['PUT'])
-    def update_slice(self, req, **kwargs):
+    @route('update_slice', ApiPaths.SLICE(), methods=['PUT'])
+    def update_slice(self, req, slice_id, **kwargs):
         """REST endpoint to update a slice."""
         try:
             slice_data = json.loads(req.body)
-            slice_id = slice_data["id"]
         except Exception as e:
             logging.error(f"Error updating slice: {e}")
             return self._json_response(status="400 Bad Request")
         slice_match = [s for s in self.network.slices if s.id == slice_id]
         if not slice_match:
-            logging.error(f"Error updating slice {slice_data['name']}: not found")
+            logging.error(f"Error updating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
         slice_match[0].update_from_dict(slice_data)
         return self._json_response(status="200 OK", data=slice_match[0].to_dict())
@@ -120,6 +119,24 @@ class APIController(ControllerBase):
         slice = slice_match[0]
         self.slices_manager.disable_slice(slice)
         return self._json_response(status="200 OK")
+    
+
+    # ====================================== HOSTS ====================================== #
+
+    @route('update_host', ApiPaths.HOST(), methods=['PUT'])
+    def update_host(self, req, host_id, **kwargs):
+        """REST endpoint to update a host."""
+        try:
+            host_data = json.loads(req.body)
+        except Exception as e:
+            logging.error(f"Error updating host: {e}")
+            return self._json_response(status="400 Bad Request")
+        logging.info(f"Updating host {host_id} with data: {host_data}")
+        if host_id not in self.network.hosts:
+            logging.error(f"Error updating host {host_id}: not found")
+            return self._json_response(status="404 Not Found")
+        host = self.network.update_host_from_dict(host_id, host_data)
+        return self._json_response(status="200 OK", data=host.to_dict())
 
 
     # ====================================== TOPOLOGY ====================================== #
@@ -128,18 +145,9 @@ class APIController(ControllerBase):
     def get_nodes(self, req, **kwargs):
         """REST endpoint to get the topology nodes."""
         nodes = []
-        hosts = self.network.hosts
-        for node_id, node in self.network.nodes.items():
-            node_dict = {
-                "id": node_id,
-                "type": node.node_type,
-            }
-            if isinstance(node.node_ref, Switch):
-                node_dict["dpid"] = node.node_ref.dp.id
-            elif isinstance(node.node_ref, Host):
-                host = hosts[Node.get_host_id(node.node_ref.mac)]
-                node_dict["ip"] = host.ipv4
-                node_dict["mac"] = host.mac
+        for node in self.network.nodes.values():
+            node_dict = {"type": node.node_type}
+            node_dict.update(node.to_dict())
             nodes.append(node_dict)
         return self._json_response(data=nodes)
 
@@ -147,43 +155,31 @@ class APIController(ControllerBase):
     def get_switches(self, req, **kwargs):
         """REST endpoint to get the topology switches."""
         switches = []
-        for switch_id, switch in self.network.switches.items():
-            switches.append({
-                "id": switch_id,
-                "dpid": switch.dp.id
-            })
+        for switch_id in self.network.switches.keys():
+            switch_node = self.network.nodes[switch_id]
+            switches.append(switch_node.to_dict())
         return self._json_response(data=switches)    
     
     @route('get_switch', ApiPaths.SWITCH(), methods=['GET'])
     def get_switch(self, req, switch_id, **kwargs):
         """REST endpoint to get the details of a specific switch."""
-        switch = self.network.switches[switch_id]
-        return self._json_response(data={
-            "id": switch_id,
-            "dpid": switch.dp.id
-        })
+        switch_node = self.network.nodes[switch_id]
+        return self._json_response(data=switch_node.to_dict())
     
     @route('get_hosts', ApiPaths.HOSTS(), methods=['GET'])
     def get_hosts(self, req, **kwargs):
         """REST endpoint to get the topology hosts."""
         hosts = []
-        for host_id, host in self.network.hosts.items():
-            hosts.append({
-                "id": host_id,
-                "ip": host.ipv4,
-                "mac": host.mac
-            })
+        for host_id in self.network.hosts.keys():
+            host_node = self.network.nodes[host_id]
+            hosts.append(host_node.to_dict())
         return self._json_response(data=hosts)
     
     @route('get_host', ApiPaths.HOST(), methods=['GET'])
     def get_host(self, req, host_id, **kwargs):
         """REST endpoint to get the details of a specific host."""
-        host = self.network.hosts[host_id]
-        return self._json_response(data={
-            "id": host_id,
-            "ip": host.ipv4,
-            "mac": host.mac
-        })
+        host_node = self.network.nodes[host_id]
+        return self._json_response(data=host_node.to_dict())
 
     @route('get_links', ApiPaths.LINKS(), methods=['GET'])
     def get_links(self, req, **kwargs):

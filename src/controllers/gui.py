@@ -95,3 +95,15 @@ class GUIController(ControllerBase):
             return Response(status=status, body=f"Error while trying to fetch slice data: {slice}")
         context = {"slice": DictObject(**slice)}
         return self.render_template(f"details/slice", context)
+    
+    @route('host_update', GuiPaths.HOST(), methods=['PUT'])
+    def host_update(self, req, host_id, **kwargs):
+        """REST endpoint to update a host."""
+        status, response = self.get_data(ApiPaths.HOST(host_id), method="PUT", data=req.body)
+        return Response(status=status, body=response)
+    
+    @route('slice_update', GuiPaths.SLICE(), methods=['PUT'])
+    def slice_update(self, req, slice_id, **kwargs):
+        """REST endpoint to update a slice."""
+        status, response = self.get_data(ApiPaths.SLICE(slice_id), method="PUT", data=req.body)
+        return Response(status=status, body=response)
