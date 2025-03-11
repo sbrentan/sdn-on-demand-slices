@@ -195,6 +195,16 @@ class Network:
             host_dict = json.loads(host_dict)
         host_node.name = host_dict["name"] if "name" in host_dict else host_node.name
         return host_node
+    
+    def update_switch_from_dict(self, switch_id, switch_dict):
+        switch_node = [node for node in self.nodes.values() if node.node_id == switch_id]
+        if not switch_node:
+            raise ValueError(f"Switch node not found for switch: {switch_id}")
+        switch_node = switch_node[0]
+        if isinstance(switch_dict, str):
+            switch_dict = json.loads(switch_dict)
+        switch_node.name = switch_dict["name"] if "name" in switch_dict else switch_node.name
+        return switch_node
 
     def __new__(cls, **kwargs) -> Network:
         if cls.__instance is None:

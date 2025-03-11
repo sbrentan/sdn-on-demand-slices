@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("network-graph").style.transform = `scale(${ratio})`;
 
     // Default data structure
-    const defaultData = {
+    graph_data = {
         nodes: await getNodes(),
         links: await getLinks()
     };
@@ -45,7 +45,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Retrieve saved layout from cookie
     const savedLayout = getCookie("networkLayout");
-    graph_data = savedLayout ? JSON.parse(savedLayout) : defaultData;
+    if (savedLayout) {
+        // if saved layout exists, use it to get x and y positions of nodes and updated default_data
+        const layout = JSON.parse(savedLayout);
+        graph_data.nodes.forEach(node => {
+            const savedNode = layout.nodes.find(n => n.id === node.id && n.type === node.type);
+            if (savedNode) {
+                node.x = savedNode.x;
+                node.y = savedNode.y;
+            }
+        });
+    }
 
     renderGraph(graph_data, slices);
 });

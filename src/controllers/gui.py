@@ -99,11 +99,17 @@ class GUIController(ControllerBase):
     @route('host_update', GuiPaths.HOST(), methods=['PUT'])
     def host_update(self, req, host_id, **kwargs):
         """REST endpoint to update a host."""
-        status, response = self.get_data(ApiPaths.HOST(host_id), method="PUT", data=req.body)
-        return Response(status=status, body=response)
+        status, response = self.get_data(ApiPaths.HOST(host_id), method="PUT", data=req.json)
+        return Response(status=status, body=json.dumps(response))
     
     @route('slice_update', GuiPaths.SLICE(), methods=['PUT'])
     def slice_update(self, req, slice_id, **kwargs):
         """REST endpoint to update a slice."""
-        status, response = self.get_data(ApiPaths.SLICE(slice_id), method="PUT", data=req.body)
-        return Response(status=status, body=response)
+        status, response = self.get_data(ApiPaths.SLICE(slice_id), method="PUT", data=req.json)
+        return Response(status=status, body=json.dumps(response))
+    
+    @route('switch_update', GuiPaths.SWITCH(), methods=['PUT'])
+    def switch_update(self, req, switch_id, **kwargs):
+        """REST endpoint to update a switch."""
+        status, response = self.get_data(ApiPaths.SWITCH(switch_id), method="PUT", data=req.json)
+        return Response(status=status, body=json.dumps(response))

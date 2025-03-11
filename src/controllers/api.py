@@ -76,6 +76,9 @@ class APIController(ControllerBase):
     @route('update_slice', ApiPaths.SLICE(), methods=['PUT'])
     def update_slice(self, req, slice_id, **kwargs):
         """REST endpoint to update a slice."""
+
+        # TODO: reset queues if bandwidth/rules are updated
+
         try:
             slice_data = json.loads(req.body)
         except Exception as e:
@@ -137,6 +140,24 @@ class APIController(ControllerBase):
             return self._json_response(status="404 Not Found")
         host = self.network.update_host_from_dict(host_id, host_data)
         return self._json_response(status="200 OK", data=host.to_dict())
+    
+
+    # ====================================== SWITCHES ====================================== #
+
+    @route('update_switch', ApiPaths.SWITCH(), methods=['PUT'])
+    def update_switch(self, req, switch_id, **kwargs):
+        """REST endpoint to update a switch."""
+        try:
+            switch_data = json.loads(req.body)
+        except Exception as e:
+            logging.error(f"Error updating switch: {e}")
+            return self._json_response(status="400 Bad Request")
+        logging.info(f"Updating switch {switch_id} with data: {switch_data}")
+        if switch_id not in self.network.switches:
+            logging.error(f"Error updating switch {switch_id}: not found")
+            return self._json_response(status="404 Not Found")
+        switch = self.network.update_switch_from_dict(switch_id, switch_data)
+        return self._json_response(status="200 OK", data=switch.to_dict())
 
 
     # ====================================== TOPOLOGY ====================================== #

@@ -47,6 +47,7 @@ class GuiPaths(Paths, BASE_URL=GUI_BASE_URL):
     INDEX = ''
     STATIC = '/static/{filename}'
     HOST = '/host/{host_id}'
+    SWITCH = '/switch/{switch_id}'
     SLICE = '/slice/{slice_id}'
     SWITCH_DETAILS = '/menu/details/switch/{switch_id}'
     HOST_DETAILS = '/menu/details/host/{host_id}'
