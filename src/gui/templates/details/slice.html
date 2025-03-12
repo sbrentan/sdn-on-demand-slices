@@ -38,16 +38,22 @@
                 </ul>
                 {% endif %}
                 {% if slice.rules.allowed_services %}
-                    <label for="allowed_services" class="form-label">Allowed Services</label>
-                    <ul class="list-group">
+                    <div class="justify-content-between d-flex align-items-center mb-2">
+                        <label for="allowed_services" class="form-label">Allowed Services</label>
+                        <button id="add-service-btn" class="btn btn-success" style="padding:0 5px"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    <ul class="list-group services-list">
                         {% for ip, ports in slice.rules.allowed_services.items() %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center p-1">
-                                <mark>{{ ip }}</mark>
-                                <div>
-                                    {% for port in ports %}
-                                        <span class="badge bg-info">{{ port }}</span>
-                                    {% endfor %}
+                            <li class="list-group-item deletable p-1">
+                                <div class="d-flex justify-content-between align-items-center ">
+                                    <mark>{{ ip }}</mark>
+                                    <div>
+                                        {% for port in ports %}
+                                            <span class="badge bg-info">{{ port }}</span>
+                                        {% endfor %}
+                                    </div>
                                 </div>
+                                <div class="delete-list-item" title="Remove" onclick="this.parentNode.classList.add('deleted')"><i class="bi bi-x"></i></div>
                             </li>
                         {% endfor %}
                     </ul>
@@ -110,5 +116,24 @@
             console.error("Failed to update slice details", error);
         }
         return false;
+    });
+    document.getElementById('add-service-btn').addEventListener('click', function() {
+        openServicesModal(function(ip, ports) {
+            console.log('IP:', ip, 'Ports:', ports);
+            return;
+            var servicesList = document.querySelector('.services-list');
+            var newItem = document.createElement('li');
+            newItem.classList.add('list-group-item', 'deletable', 'p-1');
+            newItem.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center ">
+                    <mark>${ip}</mark>
+                    <div>
+                        ${ports.map(port => `<span class="badge bg-info">${port}</span>`).join('')}
+                    </div>
+                </div>
+                <div class="delete-list-item" title="Remove" onclick="this.parentNode.classList.add('deleted')"><i class="bi bi-x"></i></div>
+            `;
+            servicesList.appendChild(newItem);
+        });
     });
 </script>

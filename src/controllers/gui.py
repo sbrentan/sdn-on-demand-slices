@@ -40,19 +40,27 @@ class GUIController(ControllerBase):
             logging.error(f"Error while trying to fetch data from {url}: {e}")
             return 500, None
 
-    def render_template(self, template_name, context: Dict = None):
+    def render_template(self, template_name, context: Dict = None, return_response=True):
         """Renders a Jinja2 template with the given context."""
         template_name = f"{template_name}.html"
         template = self.jinja_env.get_template(template_name)
         if context is None:
             context = {}
+        def include_func(template_name, **kwargs):
+            if not kwargs:
+                kwargs = {}
+            kwargs.update(context)
+            return self.render_template(template_name, kwargs, return_response=False)
         context.update({
             "base_url": GUI_BASE_URL,
             "Paths": GuiPaths,
             "ApiPaths": ApiPaths,
+            "include": include_func
         })
         render = template.render(context)
-        return Response(body=render, content_type="text/html")
+        if return_response:
+            return Response(body=render, content_type="text/html")
+        return render
     
     @route('default', '/', methods=['GET'])
     def default(self, req, **kwargs):

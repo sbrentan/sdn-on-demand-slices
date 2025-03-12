@@ -8,7 +8,7 @@ body {
     display: flex;
     flex-direction: row;
     width: 100%;
-    height: calc( 100vh - 50px );
+    height: calc( 100vh - 150px );
 }
 
 #network-graph {
@@ -223,4 +223,50 @@ button.cancel-btn::after{
     vertical-align: -.125em;
     -webkit-font-smoothing: antialiased;
     margin-left: 5px;
+}
+
+
+/* Adjust width of IP input fields */
+.ip-segment {
+    width: 80px;
+    display: inline-block;
+}
+/* Style for port pills and inline port input */
+.port-pill {
+    margin: 2px;
+}
+.port-input {
+    width: 120px;
+    display: inline-block;
+}
+#portsContainer {
+    margin-bottom: 10px;
+}
+
+.services-list li {
+    width: 100%;
+    transition: width 0.3s ease;
+}
+.services-list .delete-list-item {
+    position: absolute;
+    top: 1px;
+    right: -32px;
+    width: 30px;
+    display: flex;
+    justify-content: center;
+    color: red;
+    cursor: pointer;
+    align-items: center;
+    font-size: 20px;
+    height: 100%;
+}
+.services-list li.deletable {
+    overflow-y: clip;
+    overflow-x: visible;
+    transition: opacity 0.3s ease, height 0.3s ease 0.3s;
+    height: 40px;
+}
+.services-list li.deletable.deleted {
+    height: 0;
+    opacity: 0;
 }
