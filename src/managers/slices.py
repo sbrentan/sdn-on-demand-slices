@@ -20,6 +20,7 @@ class SlicesManager:
                 "allowed_services": {
                     "10.0.0.3": [9999, 9998],
                 },
+                "allowed_ports": [9999, 9998],
                 "allowed_protocols": [Protocol.UDP.value],
             }),
             # Slice(id="slice2", switches=["s1", "s3", "s4"], hosts=["h2", "h4"], bandwidth=1000, rules={

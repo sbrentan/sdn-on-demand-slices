@@ -112,20 +112,22 @@ body {
     border-radius: 5px 0 0 5px;
 }
 #details-menu .close-menu-btn {
+    position: fixed;
     content: '\00d7';
-    top: 5px;
-    right: 5px;
+    top: 150px;
+    right: 10px;
     font-size: 20px;
     cursor: pointer;
     height: 30px;
-    width: 32px;
+    width: 30px;
     text-align: center;
     border-radius: 15px;
     display:flex;
     justify-content: center;
     align-items: center;
     margin: 10px 10px 0 0;
-    transition: opacity 0.3s ease 0.2s, background-color 0.3s ease;
+    transition: opacity 0.3s ease 0.25s, background-color 0.3s ease;
+    background-color: #f4f4f4;
     border: 0px;
 }
 #details-menu .close-menu-btn:after {
@@ -150,9 +152,10 @@ body {
 }
 
 #details-menu .details-container {
-    transition: opacity 0.3s ease 0.2s;
+    transition: opacity 0.3s ease 0.25s;
     padding: 10px;
     width: 100%;
+    overflow-x: hidden;
 }
 #details-menu.closed .details-container{
     opacity: 0;
@@ -243,14 +246,19 @@ button.cancel-btn::after{
     margin-bottom: 10px;
 }
 
+.services-list {
+    width: calc(100% - 28px);
+}
 .services-list li {
     width: 100%;
     transition: width 0.3s ease;
+    margin: 2px 0;
+    border-radius: 5px;
 }
 .services-list .delete-list-item {
     position: absolute;
     top: 1px;
-    right: -32px;
+    right: -30px;
     width: 30px;
     display: flex;
     justify-content: center;
@@ -260,13 +268,61 @@ button.cancel-btn::after{
     font-size: 20px;
     height: 100%;
 }
+.ports-list li.deletable,
+.protocols-list li.deletable,
 .services-list li.deletable {
     overflow-y: clip;
     overflow-x: visible;
-    transition: opacity 0.3s ease, height 0.3s ease 0.3s;
+    transition: opacity 0.3s ease, height 0.3s ease 0.3s, border 0.3s ease 0.3s;
     height: 40px;
 }
+.ports-list li.deletable.deleted,
+.protocols-list li.deletable.deleted,
 .services-list li.deletable.deleted {
-    height: 0;
+    transition: opacity 0.3s ease, height 0.3s ease 0.3s, padding 0.3s ease 0.3s, margin 0.3s ease 0.3s, border 0.3s ease 0.3s;
+    height: 0 !important;
     opacity: 0;
+    padding: 0 !important;
+    margin: 0;
+    border: 0;
+}
+
+.ports-list li,
+.protocols-list li {
+    /* display: flex; */
+    justify-content: space-between;
+    align-items: center;
+    height: 30px !important;
+}
+.ports-list .delete-list-item,
+.protocols-list .delete-list-item {
+    width: 30px;
+    display: flex;
+    justify-content: center;
+    color: red;
+    cursor: pointer;
+    align-items: center;
+    font-size: 20px;
+    height: 100%;
+}
+
+#add-service-btn,
+#add-protocol-btn,
+#add-port-btn,
+div.details-container .delete-list-item{
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+div.details-container.editing #add-service-btn,
+div.details-container.editing #add-protocol-btn,
+div.details-container.editing #add-port-btn,
+div.details-container.editing .delete-list-item {
+    opacity: 1;
+}
+
+#addProtocolForm, #addPortForm {
+    padding: 10px 20px;
+}
+#addProtocolForm select, #addPortForm input {
+    width: 300px;
 }

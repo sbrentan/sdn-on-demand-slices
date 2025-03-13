@@ -16,11 +16,15 @@
 
         <link rel="stylesheet" type="text/css" href="{{ Paths.STATIC('css/style.css') }}">
         <script src="{{ Paths.STATIC('scripts/script.js') }}"></script>
-        <script src="{{ Paths.STATIC('scripts/services_modal.js') }}"></script>
+        <script src="{{ Paths.STATIC('scripts/add_service_modal.js') }}"></script>
+        <script src="{{ Paths.STATIC('scripts/add_protocol_modal.js') }}"></script>
+        <script src="{{ Paths.STATIC('scripts/add_port_modal.js') }}"></script>
     </head>
     <body>
 
-        {{ include('services_modal') }}
+        {{ include('modals/add_service') }}
+        {{ include('modals/add_protocol') }}
+        {{ include('modals/add_port') }}
 
         <div id="request-indicator" class="spinner-overlay">
             <div class="spinner-border text-primary" role="status">

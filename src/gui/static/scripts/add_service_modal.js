@@ -1,12 +1,12 @@
 // Open modal function accepting a callback
 function openServicesModal(callback) {
 	// Reset form fields
-	$('#inputForm')[0].reset();
+	$('#addServiceForm')[0].reset();
 	$('#portsContainer').empty();
 	$('#servicesModal').modal('show');
 	
 	// Set up save button click
-	$('#saveBtn').off('click').on('click', function() {
+	$('#saveServiceBtn').off('click').on('click', function() {
 		// Construct IP from the four inputs
 		var ip = $('#ip1').val() + '.' + $('#ip2').val() + '.' + $('#ip3').val() + '.' + $('#ip4').val();
 

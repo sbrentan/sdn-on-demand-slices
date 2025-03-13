@@ -69,6 +69,7 @@ async function fetchMenuDetails (url) {
         menu.classList.add('opened');
         increaseZoom(0.4);
     }
+    target.classList.remove('editing');
 
     try {
         const response = await fetch(url);
@@ -242,8 +243,6 @@ function renderGraph(data, slices) {
             event.stopPropagation();
 
             deselectAll();
-
-            console.log(d)
 
             // Highlight the clicked node
             outlineFilter.select("feFlood").attr("flood-color", OUTLINE_COLOR);
@@ -461,6 +460,8 @@ function makeEditable(details_selector, onconfirm=undefined) {
                 btn.textContent = btn.getAttribute('initial-text');
                 btn.removeAttribute('initial-text');
                 btn.classList.remove('editing');
+                // remove editing class from closest parent with class details-container
+                btn.closest('.details-container').classList.remove('editing');
                 // btn.style.backgroundColor = ''; // Reset to default color
 
                 // Remove cancel button
@@ -488,6 +489,8 @@ function makeEditable(details_selector, onconfirm=undefined) {
                 // Change button state to confirm
                 btn.textContent = 'Confirm';
                 btn.classList.add('editing');
+                // add editing class to closest parent with class details-container
+                btn.closest('.details-container').classList.add('editing');
                 // btn.style.backgroundColor = '#ffc107'; // Change to a warning color
 
                 // Create and append cancel button
@@ -509,7 +512,9 @@ function makeEditable(details_selector, onconfirm=undefined) {
                     btn.textContent = btn.getAttribute('initial-text');
                     btn.removeAttribute('initial-text');
                     btn.classList.remove('editing');
-                    btn.style.backgroundColor = ''; // Reset to default color
+                    // remove editing class from closest parent with class details-container
+                    btn.closest('.details-container').classList.remove('editing');
+                    // btn.style.backgroundColor = ''; // Reset to default color
 
                     // Remove cancel button
                     cancelButton.remove();
