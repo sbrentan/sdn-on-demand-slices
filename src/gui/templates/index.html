@@ -32,11 +32,6 @@
             </div>
         </div>
         <h1 id="title" class="display-5 text-center my-4">SDN On-Demand Slices</h1>
-        <div class="d-flex justify-content-center mt-3 mb-3">
-            <button type="button" class="btn btn-light mx-2">Add Slice</button>
-            <button type="button" class="btn btn-light mx-2">Action 2</button>
-            <button type="button" class="btn btn-light mx-2">Action 3</button>
-        </div>
         <div id="app">
             <!-- <h1>Network Topology</h1> -->
             <div id="sidebar" class="card mb-3">
@@ -44,8 +39,14 @@
                     <h2 class="h5 mb-0">Slices</h2>
                 </div>
                 <ul class="list-group list-group-flush" id="slice-list"></ul>
+                <br>
+                <button type="button" id="new-slice-btn" class="btn btn-primary mx-2" onclick="startNewSlice()">New Slice <i class="bi bi-plus-lg"></i></button>
+                <button type="button" id="cancel-new-slice-btn" class="btn btn-secondary mx-2" style="margin-top: 5px; display: none;" onclick="finalizeNewSlice()">Cancel <i class="bi bi-x-lg"></i></button>
+                <br>
+                <span id="slice-status"></span>
             </div>
             <div id="graph-container">
+                <div class="graph-info"></div>
                 <div class="graph-controls">
                     <button id="zoom-plus" title="Zoom In" onclick="increaseZoom()"><i class="bi bi-zoom-in"></i></button>
                     <button id="zoom-minus" title="Zoom Out" onclick="decreaseZoom()"><i class="bi bi-zoom-out"></i></button>
@@ -54,7 +55,7 @@
                 </div>
                 <svg id="network-graph"></svg>
             </div>
-        <div id="details-menu" class="closed mb-3">
+            <div id="details-menu" class="closed mb-3">
                 <div id='details-container' class="details-container"></div>
                 <div class="close-menu-btn"></div>
             </div>

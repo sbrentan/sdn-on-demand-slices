@@ -1,7 +1,7 @@
 const API_BASE_URL = 'http://localhost:8086/api';
 const GUI_BASE_URL = 'http://localhost:8086/gui/';
 
-/* ---------------------- Global variable ---------------------- */
+/* ---------------------- Global variables ---------------------- */
 
 const DISABLED_COLOR = "#dc3545";
 const ENABLED_COLOR = "#28a745";
@@ -10,6 +10,7 @@ const LINK_COLOR = "#aaa";
 const NODE_SIZE = 35;
 
 var graph_data = undefined;
+var slices = [];
 var ratio = 1.25;
 var outlineFilter = undefined;
 
@@ -25,7 +26,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         links: await getLinks()
     };
 
-    const slices = await getSlices();
+    slices = await getSlices();
 
     const sliceList = document.getElementById("slice-list");
     slices.forEach((slice, index) => {
@@ -61,6 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function fetchMenuDetails (url) {
+    if (isCreatingNewSlice) return;
     const menu = document.getElementById('details-menu');
     const target = document.getElementById('details-container');
     // add class
@@ -99,6 +101,7 @@ async function fetchMenuDetails (url) {
 function closeDetailsMenu() {
     
     let menu = document.querySelector('#details-menu');
+    if (!menu.classList.contains('opened')) return;
     menu.classList.add('closed');
     decreaseZoom(0.4);
     menu.classList.remove('opened');
@@ -218,6 +221,8 @@ function renderGraph(data, slices) {
             }
         })
         .on("click", function(event, d) {
+            if (isCreatingNewSlice)
+                return;
             event.stopPropagation();
 
             deselectAll();
@@ -240,6 +245,8 @@ function renderGraph(data, slices) {
         .attr("cursor", "pointer")
         .call(drag(simulation))
         .on("click", async function(event, d) {
+            if (isCreatingNewSlice)
+                return;
             event.stopPropagation();
 
             deselectAll();
@@ -282,6 +289,8 @@ function renderGraph(data, slices) {
 
     const sliceList = document.getElementById("slice-list");
     sliceList.addEventListener("click", async function (event) {
+        if (isCreatingNewSlice)
+            return;
         let target = event.target;
         if (event.target.tagName === "SPAN") target = event.target.parentElement;
         const selectedSlice = slices[target.dataset.index];
@@ -295,6 +304,138 @@ function renderGraph(data, slices) {
         }
     });
 }
+
+
+
+// Global variables to manage new slice creation
+let isCreatingNewSlice = false;
+let newSliceNodes = []; // stores selected node IDs
+let newSliceIdCounter = 0;
+
+// Start new slice creation mode
+function startNewSlice() {
+    isCreatingNewSlice = true;
+    closeDetailsMenu();
+    newSliceNodes = [];
+    deselectAll(); // Deselect any previous selection (and hide lateral menu)
+    document.querySelector(".graph-info").innerText = "Select the nodes in the network to include in the new slice:";
+    document.querySelector(".graph-info").classList.add("show");
+
+    slice_lis = document.querySelectorAll("#slice-list li");
+    for (let slice_li of slice_lis)
+        slice_li.classList.add("disabled");
+
+    new_slice_btn = document.getElementById("new-slice-btn");
+    new_slice_btn.onclick = finalizeNewSlice;
+    new_slice_btn.innerHTML = "Confirm New Slice <i class='bi bi-pencil-fill'></i>";
+
+    cancel_slice_btn = document.getElementById("cancel-new-slice-btn");
+    cancel_slice_btn.style.display = "inline-block";
+    cancel_slice_btn.onclick = cancelNewSlice;
+
+    // Override node click events to handle slice selection and disable lateral menu events
+    d3.selectAll("image")
+      .on("click.newSlice", function(event, d) {
+         event.stopPropagation();
+         event.stopImmediatePropagation(); // Prevent the lateral menu from appearing
+         toggleNodeSelectionForNewSlice(d3.select(this), d);
+      });
+
+    // Also disable lateral menu events on links during new slice mode
+    d3.selectAll("line")
+      .on("click.newSlice", function(event, d) {
+         event.stopPropagation();
+         event.stopImmediatePropagation();
+      });
+}
+
+// Toggle node selection for the new slice
+function toggleNodeSelectionForNewSlice(nodeSelection, nodeData) {
+    const nodeId = nodeData.id;
+    if (newSliceNodes.includes(nodeId)) {
+        newSliceNodes = newSliceNodes.filter(id => id !== nodeId);
+    } else {
+        newSliceNodes.push(nodeId);
+    }
+    
+    // For visual feedback: compute the links connecting the currently selected nodes
+    const computedLinks = graph_data.links.filter(link => {
+        const sourceId = (typeof link.source === "object") ? link.source.id : link.source;
+        const targetId = (typeof link.target === "object") ? link.target.id : link.target;
+        return newSliceNodes.includes(sourceId) && newSliceNodes.includes(targetId);
+    }).map(link => link.id);
+    
+    // Use your existing highlightSlice to highlight the selected nodes and their interconnecting links
+    const tempSlice = { nodes: newSliceNodes, links: computedLinks };
+    highlightSlice(null, tempSlice);
+}
+
+// Finalize new slice creation; the final slice object stores each node's id and type.
+function finalizeNewSlice() {
+    if (!isCreatingNewSlice) return;
+    
+    // Build the final slice, including the type of each selected node
+    const finalNodes = newSliceNodes.map(nodeId => {
+        let nodeData = graph_data.nodes.find(n => n.id === nodeId);
+        return { id: nodeId, type: nodeData ? nodeData.type : null };
+    });
+    
+    const newSlice = {
+        id: `slice_${++newSliceIdCounter}`,
+        nodes: finalNodes // links will be inferred later by your Ryu controller
+    };
+
+    console.log("New slice:", newSlice);
+    return;
+    
+    slices.push(newSlice);
+    updateSliceListUI();
+    
+    // Reset new slice mode and remove temporary event listeners on nodes and links
+    isCreatingNewSlice = false;
+    newSliceNodes = [];
+    d3.selectAll("image").on("click.newSlice", null);
+    d3.selectAll("line").on("click.newSlice", null);
+}
+
+// (Optional) Update your slice list UI based on the slices array.
+function updateSliceListUI() {
+    const sliceList = document.getElementById("slice-list");
+    sliceList.innerHTML = "";
+    slices.forEach((slice, index) => {
+        const listItem = document.createElement("div");
+        listItem.innerText = `Slice ${index + 1}: ${slice.nodes.length} node(s)`;
+        listItem.dataset.index = index;
+        listItem.classList.add("slice-item");
+        sliceList.appendChild(listItem);
+    });
+}
+
+// Cancel new slice creation
+function cancelNewSlice() {
+    if (!isCreatingNewSlice) return;
+
+    // Reset new slice mode and remove temporary event listeners on nodes and links
+    isCreatingNewSlice = false;
+    newSliceNodes = [];
+    d3.selectAll("image").on("click.newSlice", null);
+    d3.selectAll("line").on("click.newSlice", null);
+
+    slice_list_lis = document.querySelectorAll("#slice-list li");
+    for (let slice_li of slice_list_lis)
+        slice_li.classList.remove("disabled");
+
+    cancel_slice_btn = document.getElementById("cancel-new-slice-btn");
+    cancel_slice_btn.style.display = "none";
+
+    new_slice_btn = document.getElementById("new-slice-btn");
+    new_slice_btn.onclick = startNewSlice;
+    new_slice_btn.innerHTML = "New Slice <i class='bi bi-plus-lg'></i>";
+
+    document.querySelector(".graph-info").classList.remove("show");
+}
+
+
 
 /* ----------------------- Cookie helper ----------------------- */
 
