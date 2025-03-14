@@ -104,6 +104,15 @@ class GUIController(ControllerBase):
         context = {"slice": DictObject(**slice)}
         return self.render_template(f"details/slice", context)
     
+    @route('new_slice_details', GuiPaths.NEW_SLICE_DETAILS(), methods=['GET'])
+    def new_slice_details(self, req, **kwargs):
+        """REST endpoint to serve the details of a specific slice."""
+        slice = {"name": "New Slice", "hosts": [], "switches": [], "active": True, "rules": {
+            "allowed_protocols": [], "allowed_ports": [], "allowed_services": []
+        }}
+        context = {"slice": DictObject(**slice), "new_slice": True}
+        return self.render_template(f"details/slice", context)
+    
     @route('host_update', GuiPaths.HOST(), methods=['PUT'])
     def host_update(self, req, host_id, **kwargs):
         """REST endpoint to update a host."""

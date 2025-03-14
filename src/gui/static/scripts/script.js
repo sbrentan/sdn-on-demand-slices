@@ -14,6 +14,8 @@ var slices = [];
 var ratio = 1.25;
 var outlineFilter = undefined;
 
+// TODO: replace hard-coded urls with ApiPaths methods
+
 /* ----------------------- Onload helper ----------------------- */
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -313,9 +315,10 @@ let newSliceNodes = []; // stores selected node IDs
 let newSliceIdCounter = 0;
 
 // Start new slice creation mode
-function startNewSlice() {
+async function startNewSlice() {
+    await fetchMenuDetails(`/gui/menu/details/new_slice`);
     isCreatingNewSlice = true;
-    closeDetailsMenu();
+    
     newSliceNodes = [];
     deselectAll(); // Deselect any previous selection (and hide lateral menu)
     document.querySelector(".graph-info").innerText = "Select the nodes in the network to include in the new slice:";
@@ -414,6 +417,8 @@ function updateSliceListUI() {
 // Cancel new slice creation
 function cancelNewSlice() {
     if (!isCreatingNewSlice) return;
+
+    closeDetailsMenu();
 
     // Reset new slice mode and remove temporary event listeners on nodes and links
     isCreatingNewSlice = false;

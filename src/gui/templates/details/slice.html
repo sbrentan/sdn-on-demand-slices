@@ -1,6 +1,10 @@
 <div class="container my-4" id="slice-details">
     <h3>
+        {% if new_slice %}
+        New Slice
+        {% else %}
         Slice [{{ slice.id }}]
+        {% endif %}
     </h3>
     <h6 style="padding: 0 10px;">
         {% if slice.active %}
@@ -90,6 +94,13 @@
         <div class="col-md-12">
             <h5>Actions</h5>
             <div class="row slice-actions" style="padding: 0 10px;">
+                {% if new_slice %}
+                <div class="col-md-6" style="padding: 0 3px;">
+                    <button type="button" class="btn btn-success w-100" title="Create">
+                        Create Slice <i class="bi bi-plus"></i>
+                    </button>
+                </div>
+                {% else %}
                 <div class="col-md-4" style="padding: 0 3px;">
                     <button type="button" class="btn btn-primary w-100 confirm-btn" title="Edit">Edit</i></button>
                 </div>
@@ -118,11 +129,21 @@
                         Delete <i class="bi bi-trash-fill"></i>
                     </button>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 <script>
+    {% if new_slice %}
+    document.getElementById('details-container').classList.add('editing');
+    let details = document.querySelector("#slice-details");
+    let form = details.querySelector('.details-form');
+    form.querySelectorAll('input.editable').forEach(input => {
+        input.classList.add('editing')
+        input.removeAttribute('readonly');
+    });
+    {% else %}
     makeEditable("#slice-details", onconfirm = async function(data) {
         try {
             // TODO: check implementation
@@ -133,6 +154,7 @@
         }
         return false;
     });
+    {% endif %}
     document.getElementById('add-service-btn')?.addEventListener('click', function() {
         openServicesModal(function(ip, ports) {
             var servicesList = document.querySelector('.services-list');
