@@ -9,6 +9,12 @@ function openPortsModal(callback) {
 	
 	// Set up save button click
 	$('#savePortBtn').off('click').on('click', function() {
+        // Check if port is valid
+        var port = $('#port_input').val();
+        if (port === '' || isNaN(port) || port < 1 || port > 65535) {
+            alert('Please enter a valid port number between 1 and 65535.');
+            return;
+        }
 		// Construct IP from the four inputs
 		var port = $('#port_input').val();
 		

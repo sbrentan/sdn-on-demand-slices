@@ -41,7 +41,7 @@
                 <ul class="list-group list-group-flush" id="slice-list"></ul>
                 <br>
                 <button type="button" id="new-slice-btn" class="btn btn-primary mx-2" onclick="startNewSlice()">New Slice <i class="bi bi-plus-lg"></i></button>
-                <button type="button" id="cancel-new-slice-btn" class="btn btn-secondary mx-2" style="margin-top: 5px; display: none;" onclick="finalizeNewSlice()">Cancel <i class="bi bi-x-lg"></i></button>
+                <button type="button" id="cancel-new-slice-btn" class="btn btn-secondary mx-2" style="margin-top: 5px; display: none;" onclick="canceleNewSlice()">Cancel <i class="bi bi-x-lg"></i></button>
                 <br>
                 <span id="slice-status"></span>
             </div>
@@ -68,6 +68,8 @@
     close_button.addEventListener('click', function(event) {
         deselectAll();
         closeDetailsMenu();
+        if (isCreatingNewSlice)
+            cancelNewSlice();
     });
 
     document.addEventListener('htmx:configRequest', function(event) {

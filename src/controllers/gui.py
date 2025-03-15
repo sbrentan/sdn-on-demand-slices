@@ -106,9 +106,9 @@ class GUIController(ControllerBase):
     
     @route('new_slice_details', GuiPaths.NEW_SLICE_DETAILS(), methods=['GET'])
     def new_slice_details(self, req, **kwargs):
-        """REST endpoint to serve the details of a specific slice."""
+        """REST endpoint to serve the menu details of a new slice."""
         slice = {"name": "New Slice", "hosts": [], "switches": [], "active": True, "rules": {
-            "allowed_protocols": [], "allowed_ports": [], "allowed_services": []
+            "allowed_protocols": [], "allowed_ports": [], "allowed_services": [], "min_rate": "", "max_rate": ""
         }}
         context = {"slice": DictObject(**slice), "new_slice": True}
         return self.render_template(f"details/slice", context)
@@ -129,4 +129,12 @@ class GUIController(ControllerBase):
     def switch_update(self, req, switch_id, **kwargs):
         """REST endpoint to update a switch."""
         status, response = self.get_data(ApiPaths.SWITCH(switch_id), method="PUT", data=req.json)
+        return Response(status=status, body=json.dumps(response))
+
+    @route('new_slice', GuiPaths.SLICES(), methods=['POST'])
+    def new_slice(self, req, **kwargs):
+        """REST endpoint to create a new slice."""
+        json_data = req.json
+        json_data["active"] = True
+        status, response = self.get_data(ApiPaths.SLICES(), method="POST", data=json_data)
         return Response(status=status, body=json.dumps(response))

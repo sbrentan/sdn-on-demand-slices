@@ -1,5 +1,5 @@
-const API_BASE_URL = 'http://localhost:8086/api';
-const GUI_BASE_URL = 'http://localhost:8086/gui/';
+const API_BASE_URL = 'http://localhost:8080/api';
+const GUI_BASE_URL = 'http://localhost:8080/gui/';
 
 /* ---------------------- Global variables ---------------------- */
 
@@ -13,6 +13,12 @@ var graph_data = undefined;
 var slices = [];
 var ratio = 1.25;
 var outlineFilter = undefined;
+
+
+// Global variables to manage new slice creation
+let isCreatingNewSlice = false;
+let newSliceNodes = []; // stores selected node IDs
+let newSliceIdCounter = 0;
 
 // TODO: replace hard-coded urls with ApiPaths methods
 
@@ -40,7 +46,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         li.appendChild(span);
         const sliceText = document.createElement("span");
         sliceText.className = "slice-text";
-        sliceText.textContent = `${slice.name} [${slice.id}]`;
+        sliceText.textContent = `${slice.name}`; // [${slice.id}]`;
         li.appendChild(sliceText);
         li.dataset.index = index;
         sliceList.appendChild(li);
@@ -307,12 +313,7 @@ function renderGraph(data, slices) {
     });
 }
 
-
-
-// Global variables to manage new slice creation
-let isCreatingNewSlice = false;
-let newSliceNodes = []; // stores selected node IDs
-let newSliceIdCounter = 0;
+/* ----------------------- New Slice Management ----------------------- */
 
 // Start new slice creation mode
 async function startNewSlice() {
@@ -374,7 +375,7 @@ function toggleNodeSelectionForNewSlice(nodeSelection, nodeData) {
 }
 
 // Finalize new slice creation; the final slice object stores each node's id and type.
-function finalizeNewSlice() {
+async function finalizeNewSlice() {
     if (!isCreatingNewSlice) return;
     
     // Build the final slice, including the type of each selected node
@@ -382,17 +383,47 @@ function finalizeNewSlice() {
         let nodeData = graph_data.nodes.find(n => n.id === nodeId);
         return { id: nodeId, type: nodeData ? nodeData.type : null };
     });
+
+    // get all the nodes with `type == 'Host'` and add it to hosts array
+    let hosts = [];
+    let switches = [];
+    for (let node of finalNodes) {
+        if (node.type === 'Host')
+            hosts.push(node.id);
+        else if (node.type === 'Switch')
+            switches.push(node.id);
+    }
+
+    // Check if at least one node is selected
+    if (finalNodes.length < 2) {
+        alert("Please select at least two nodes.");
+        return;
+    }
     
     const newSlice = {
-        id: `slice_${++newSliceIdCounter}`,
-        nodes: finalNodes // links will be inferred later by your Ryu controller
+        hosts: hosts,
+        switches: switches,
     };
 
+    // Fetch slice form data
+    invalid = false;
+    document.querySelector('.details-form').querySelectorAll('.editable').forEach(input => {
+        if (invalid) return;
+        if (input.value === "") {
+            invalid = true;
+            alert("Please fill all the fields.");
+            return;
+        }
+        newSlice[input.name] = input.value;
+    });
+    if (invalid) return;
+    const sliceRules = getDefinedSliceRules();
+    if (!sliceRules) return;
+    newSlice['rules'] = sliceRules;
+
     console.log("New slice:", newSlice);
-    return;
-    
-    slices.push(newSlice);
-    updateSliceListUI();
+
+    await fetchData('slices', 'POST', newSlice, GUI_BASE_URL);
     
     // Reset new slice mode and remove temporary event listeners on nodes and links
     isCreatingNewSlice = false;
@@ -419,6 +450,8 @@ function cancelNewSlice() {
     if (!isCreatingNewSlice) return;
 
     closeDetailsMenu();
+
+    deselectAll();
 
     // Reset new slice mode and remove temporary event listeners on nodes and links
     isCreatingNewSlice = false;
@@ -585,7 +618,7 @@ async function getLinks() {
 
 /* ----------------------- Editable Forms ----------------------- */
 
-function makeEditable(details_selector, onconfirm=undefined) {
+function makeEditable(details_selector, onconfirm=undefined, oncancel=undefined) {
     let details = document.querySelector(details_selector);
     if (!details) console.log("No details found");
     let btn = details.querySelector('.confirm-btn');
@@ -597,31 +630,40 @@ function makeEditable(details_selector, onconfirm=undefined) {
             if (btn.classList.contains('editing')) {
                 // Collect updated parameters
                 const updatedParams = {};
+                valid = true;
                 form.querySelectorAll('.editable').forEach(input => {
-                    input.setAttribute('readonly', true);
+                    if (input.value === "") {
+                        valid = false;
+                        alert("Please fill all the fields.");
+                        return;
+                    }
                     updatedParams[input.name] = input.value;
                 });
-
-                // Reset button state
-                btn.textContent = btn.getAttribute('initial-text');
-                btn.removeAttribute('initial-text');
-                btn.classList.remove('editing');
-                // remove editing class from closest parent with class details-container
-                btn.closest('.details-container').classList.remove('editing');
-                // btn.style.backgroundColor = ''; // Reset to default color
-
-                // Remove cancel button
-                const cancelButton = details.querySelector('.cancel-btn');
-                if (cancelButton) {
-                    cancelButton.remove();
-                }
+                if (!valid) return;
                 
                 if (onconfirm) {
-                    onconfirm(updatedParams).then((result) => {
+                    valid = onconfirm(updatedParams).then((result) => {
                         if (!result)
-                            alert("Failed to save the data.");
-                        else
-                            window.location.reload();
+                            return;
+
+                        form.querySelectorAll('.editable').forEach(input => {
+                            input.setAttribute('readonly', true);
+                        });
+
+                        // Reset button state
+                        btn.textContent = btn.getAttribute('initial-text');
+                        btn.removeAttribute('initial-text');
+                        btn.classList.remove('editing');
+                        // remove editing class from closest parent with class details-container
+                        btn.closest('.details-container').classList.remove('editing');
+                        // btn.style.backgroundColor = ''; // Reset to default color
+
+                        // Remove cancel button
+                        const cancelButton = details.querySelector('.cancel-btn');
+                        if (cancelButton) {
+                            cancelButton.remove();
+                        }
+                        window.location.reload();
                     });
                 }
             } else {
@@ -664,8 +706,100 @@ function makeEditable(details_selector, onconfirm=undefined) {
 
                     // Remove cancel button
                     cancelButton.remove();
+
+                    if (oncancel) {
+                        oncancel();
+                    }
                 });
             }
         });
+    }
+}
+function getDefinedSliceRules() {
+    rules = {};
+    // fetch ports
+    var portsList = document.querySelector('.ports-list');
+    var ports = [];
+    portsList.querySelectorAll('li').forEach(li => {
+        ports.push(li.querySelector('span').innerText);
+    });
+    rules['allowed_ports'] = ports;
+    // fetch protocols
+    var protocolsList = document.querySelector('.protocols-list');
+    var protocols = [];
+    protocolsList.querySelectorAll('li').forEach(li => {
+        protocols.push(li.querySelector('span').innerText);
+    });
+    rules['allowed_protocols'] = protocols;
+    // fetch services
+    var servicesList = document.querySelector('.services-list');
+    var services = {};
+    servicesList.querySelectorAll('li').forEach(li => {
+        var ip = li.querySelector('mark').innerText;
+        var ports = [];
+        li.querySelectorAll('.badge').forEach(span => {
+            ports.push(span.innerText);
+        });
+        services[ip] = ports;
+    });
+    rules['allowed_services'] = services;
+    // check if at least a rule is defined
+    if (Object.keys(services).length === 0 && protocols.length === 0 && ports.length === 0) {
+        alert("At least one rule must be defined");
+        return false;
+    }
+    return rules;
+}
+function restoreInitialSliceRules() {
+    // restore protocols initial values
+    var protocolsList = document.querySelector('.protocols-list');
+    var initialProtocols = JSON.parse(protocolsList.getAttribute('initial-values'));
+    protocolsList.innerHTML = '';
+    for (var protocol of initialProtocols) {
+        var newItem = document.createElement('li');
+        newItem.classList.add('deletable');
+        newItem.innerHTML = `
+            <div class="d-flex align-items-center">
+                <span class="badge bg-info" style="font-size: 1em;">${protocol}</span>
+                <span class="delete-list-item" title="Remove" onclick="this.parentNode.parentNode.classList.add('deleted')"><i class="bi bi-x"></i></span>
+            </div>
+        `;
+        protocolsList.appendChild(newItem);
+    }
+
+    // restore ports initial values
+    var portsList = document.querySelector('.ports-list');
+    var initialPorts = JSON.parse(portsList.getAttribute('initial-values'));
+    portsList.innerHTML = '';
+    for (var port of initialPorts) {
+        var newItem = document.createElement('li');
+        newItem.classList.add('deletable');
+        newItem.innerHTML = `
+            <div class="d-flex align-items-center">
+                <span class="badge bg-info" style="font-size: 1em;">${port}</span>
+                <span class="delete-list-item" title="Remove" onclick="this.parentNode.parentNode.classList.add('deleted')"><i class="bi bi-x"></i></span>
+            </div>
+        `;
+        portsList.appendChild(newItem);
+    }
+
+    // restore services initial values
+    var servicesList = document.querySelector('.services-list');
+    var initialServices = JSON.parse(servicesList.getAttribute('initial-values'));
+    servicesList.innerHTML = '';
+    for (var ip in initialServices) {
+        var ports = initialServices[ip];
+        var newItem = document.createElement('li');
+        newItem.classList.add('list-group-item', 'deletable', 'p-1');
+        newItem.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center ">
+                <mark>${ip}</mark>
+                <div>
+                    ${ports.map(port => `<span class="badge bg-info">${port}</span>`).join('')}
+                </div>
+            </div>
+            <div class="delete-list-item" title="Remove" onclick="this.parentNode.classList.add('deleted')"><i class="bi bi-x"></i></div>
+        `;
+        servicesList.appendChild(newItem);
     }
 }

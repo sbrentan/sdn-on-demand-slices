@@ -1,5 +1,5 @@
 // Open modal function accepting a callback
-function openProtocolsModal(callback) {
+function openProtocolsModal(callback, protocols) {
 	// Reset form fields
 	$('#addProtocolForm')[0].reset();
 	$('#protocolsModal').modal('show');
@@ -9,6 +9,16 @@ function openProtocolsModal(callback) {
 	
 	// Set up save button click
 	$('#saveProtocolBtn').off('click').on('click', function() {
+		// Check if protocol is valid
+		var protocol = $('#protocol_select').val();
+		if (protocol === '' || protocol === null || protocol === undefined) {
+			alert('Please select a protocol.');
+			return;
+		}
+		if (protocols.includes(protocol)) {
+			alert('This protocol is already in use.');
+			return;
+		}
 		// Construct IP from the four inputs
 		var protocol = $('#protocol_select').val();
 		

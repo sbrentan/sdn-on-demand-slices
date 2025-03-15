@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from typing import List, Optional
 from enum import Enum
 from dataclasses import dataclass
@@ -139,8 +140,9 @@ class Slice:
             data = json.loads(data)
         self.name = data["name"] if "name" in data else self.name
         self.rules = data["rules"] if "rules" in data else self.rules
-        self.switches = [n for n in data["nodes"] if n.startswith("s")] if "nodes" in data else self.switches # TODO: change
-        self.hosts = [n for n in data["nodes"] if n.startswith("h")] if "nodes" in data else self.hosts # TODO: change
+        # TODO: implement hosts and switcheds update from data
+        # self.switches = data["switches"] if "nodes" in data else self.switches # TODO: change
+        # self.hosts = data['hosts'] if "nodes" in data else self.hosts # TODO: change
         self.active = bool(data["active"]) if "active" in data else self.active
         self.min_rate = data["min_rate"] if "min_rate" in data else self.min_rate
         self.max_rate = data["max_rate"] if "max_rate" in data else self.max_rate
@@ -149,13 +151,13 @@ class Slice:
     @staticmethod
     def from_dict(data: dict) -> Slice:
         slice = Slice(
-            id=data["id"],
+            id=uuid.uuid4().hex,
             rules=data["rules"],
-            switches=[n for n in data["nodes"] if n.startswith("s")], # TODO: change
-            hosts=[n for n in data["nodes"] if n.startswith("h")], # TODO: change
+            switches=data["switches"],
+            hosts=data["hosts"],
             active=bool(data["active"]) if "active" in data else False,
-            min_rate=data.get("min_rate"),
-            max_rate=data.get("max_rate")
+            min_rate=data.get("min_rate", None),
+            max_rate=data.get("max_rate", None)
         )
         if "name" in data:
             slice.name = data["name"]

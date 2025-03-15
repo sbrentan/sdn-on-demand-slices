@@ -1,12 +1,39 @@
 // Open modal function accepting a callback
-function openServicesModal(callback) {
+function openServicesModal(callback, service_ports) {
 	// Reset form fields
 	$('#addServiceForm')[0].reset();
 	$('#portsContainer').empty();
 	$('#servicesModal').modal('show');
+
+	// on modal show, focus on the first input
+	$('#servicesModal').on('shown.bs.modal', function() {
+		$('#ip1').focus();
+	});
 	
 	// Set up save button click
 	$('#saveServiceBtn').off('click').on('click', function() {
+		// Validate IP
+		var ipSegments = [$('#ip1').val(), $('#ip2').val(), $('#ip3').val(), $('#ip4').val()];
+		var validIp = ipSegments.every(function(seg) {
+			return seg.length > 0;
+		});
+		if (!validIp) {
+			alert('Please enter a valid IP address.');
+			return;
+		}
+		// Validate ports
+		var inputPorts = $('#portsContainer .port-pill');
+		var validPorts = inputPorts.length > 0;
+		$('#portsContainer .port-pill').each(function() {
+			var portText = $(this).clone().children().remove().end().text().trim();
+			if (!portText) {
+				validPorts = false;
+			}
+		});
+		if (!validPorts) {
+			alert('Please enter valid port numbers.');
+			return;
+		}
 		// Construct IP from the four inputs
 		var ip = $('#ip1').val() + '.' + $('#ip2').val() + '.' + $('#ip3').val() + '.' + $('#ip4').val();
 
@@ -18,6 +45,12 @@ function openServicesModal(callback) {
 				ports.push(portText);
 			}
 		});
+
+		// Check if the ip is already present as key in service_ports
+		if (ip in service_ports) {
+			alert('This IP is already present in the service configuration.');
+			return;
+		}
 		
 		$('#servicesModal').modal('hide');
 		if (callback && typeof callback === 'function') {
