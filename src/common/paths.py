@@ -52,5 +52,6 @@ class GuiPaths(Paths, BASE_URL=GUI_BASE_URL):
     SLICES = '/slices'
     SWITCH_DETAILS = '/menu/details/switch/{switch_id}'
     HOST_DETAILS = '/menu/details/host/{host_id}'
+    LINK_DETAILS = '/menu/details/link/{link_id}'
     SLICE_DETAILS = '/menu/details/slice/{slice_id}'
     NEW_SLICE_DETAILS = '/menu/details/new_slice'

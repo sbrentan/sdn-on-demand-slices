@@ -53,7 +53,7 @@ class Node:
 
     @staticmethod
     def get_host_id(mac: str) -> str:
-        return "h" + mac
+        return mac
 
     @staticmethod
     def get_node_id(node_ref: Switch | Host) -> str:

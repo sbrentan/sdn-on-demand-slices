@@ -217,3 +217,18 @@ class APIController(ControllerBase):
                 "target": connection.dst[1].node_id
             })
         return self._json_response(data=links)
+
+    @route('get_link', ApiPaths.LINK(), methods=['GET'])
+    def get_link(self, req, link_id, **kwargs):
+        """REST endpoint to get the details of a specific link."""
+        link = [c for c in self.network.connections if c.link_id == link_id]
+        if not link:
+            return self._json_response(status="404 Not Found")
+        link = link[0]
+        link_to_slice_dict = SliceUtils.get_link_to_slice_dict(skip_active_slices=False)
+        return self._json_response(data={
+            "id": link_id,
+            "source": link.src[1].name,
+            "target": link.dst[1].name,
+            "slices": [s.to_dict() for s in link_to_slice_dict[link_id]]
+        })

@@ -35,7 +35,7 @@ body {
     margin-top: 0;
 }
 
-#slice-list {
+ul.slice-list {
     list-style: none;
     padding: 0;
 }
@@ -48,13 +48,13 @@ body {
     background-color: #007bff;
 }
 
-#slice-list .slice-text {
+ul.slice-list .slice-text {
     margin-left: 10px;
     font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
     font-size: 14px;
 }
 
-#slice-list li {
+ul.slice-list li {
     border: 1px solid #ddd;
     margin: 5px 0;
     padding: 10px;
@@ -64,20 +64,27 @@ body {
     transition: background-color 0.3s;
 }
 
-#slice-list li.disabled {
+ul.slice-list li.disabled {
     background-color: #f4f4f4;
     color: #aaa;
 }
 
-#slice-list li:hover {
+ul.slice-list li:hover {
     background-color: #e0f7fa;
 }
 
-#slice-list li.selected {
+ul.slice-list li.selected {
     background-color: #b3e5fc;
 }
-#slice-list li.selected span {
+ul.slice-list li.selected span {
     color: #000 !important;
+}
+
+ul.slice-list li.unselectable {
+    border-radius: 5px !important;
+    background-color: white !important;
+    border: 1px solid #ddd;
+    cursor: default !important;
 }
 
 #graph-container {

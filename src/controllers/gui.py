@@ -94,6 +94,15 @@ class GUIController(ControllerBase):
             return Response(status=status, body=f"Error while trying to fetch host data: {host}")
         context = {"host": DictObject(**host)}
         return self.render_template(f"details/host", context)
+
+    @route('link_details', GuiPaths.LINK_DETAILS(), methods=['GET'])
+    def link_details(self, req, link_id, **kwargs):
+        """REST endpoint to serve the details of a specific link."""
+        status, link = self.get_data(ApiPaths.LINK(link_id))
+        if status != 200:
+            return Response(status=status, body=f"Error while trying to fetch link data: {link}")
+        context = {"link": DictObject(**link)}
+        return self.render_template(f"details/link", context)
     
     @route('slice_details', GuiPaths.SLICE_DETAILS(), methods=['GET'])
     def slice_details(self, req, slice_id, **kwargs):

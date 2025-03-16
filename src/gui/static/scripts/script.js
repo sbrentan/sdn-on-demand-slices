@@ -228,7 +228,7 @@ function renderGraph(data, slices) {
                 d3.select(this).attr("stroke-width", 2);
             }
         })
-        .on("click", function(event, d) {
+        .on("click", async function(event, d) {
             if (isCreatingNewSlice)
                 return;
             event.stopPropagation();
@@ -239,6 +239,8 @@ function renderGraph(data, slices) {
             d3.select(this)
                 .attr("stroke", OUTLINE_COLOR)
                 .attr("stroke-width", 4);
+
+            await fetchMenuDetails(`/gui/menu/details/link/${d.id}`);
         });
     
     const node = svg.append("g")
