@@ -93,6 +93,8 @@ class APIController(ControllerBase):
             logging.error(f"Error updating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
         slice_match[0].update_from_dict(slice_data)
+        logging.info(f"Updating slice {slice_id} with data: {slice_data}")
+        logging.info(f"Updated slice: " + json.dumps(slice_match[0].to_dict(), indent=4))
         return self._json_response(status="200 OK", data=slice_match[0].to_dict())
 
     @route('delete_slice', ApiPaths.SLICE(), methods=['DELETE'])

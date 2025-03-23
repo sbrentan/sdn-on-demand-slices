@@ -19,8 +19,10 @@
     <div class="row mb-3">
         <div class="col-md-12">
             <div class="form-group details-form">
+                {% if not new_slice %}
                 <label for="slice_id" class="form-label">Id</label>
                 <input type="text" class="form-control" id="slice_id" value="{{ slice.id }}" readonly>
+                {% endif %}
                 <label for="slice_name" class="form-label">Name</label>
                 <input type="text" class="form-control editable" id="slice_name" name="name" value="{{ slice.name }}" readonly>
                 <div class="row">
@@ -47,7 +49,7 @@
                             <li class="deletable">
                                 <div class="d-flex align-items-center">
                                     <span class="badge bg-info" style="font-size: 1em;">{{ protocol }}</span>
-                                    <span class="delete-list-item" title="Remove" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
+                                    <span class="delete-list-item" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
                                 </div>
                             </li>
                         {% endfor %}
@@ -63,7 +65,7 @@
                             <li class="deletable">
                                 <div class="d-flex align-items-center">
                                     <span class="badge bg-info" style="font-size: 1em;">{{ port }}</span>
-                                    <span class="delete-list-item" title="Remove" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
+                                    <span class="delete-list-item" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
                                 </div>
                             </li>
                         {% endfor %}
@@ -85,7 +87,7 @@
                                         {% endfor %}
                                     </div>
                                 </div>
-                                <div class="delete-list-item" title="Remove" onclick="deleteRule(this.parentNode)"><i class="bi bi-x"></i></div>
+                                <div class="delete-list-item" onclick="deleteRule(this.parentNode)"><i class="bi bi-x"></i></div>
                             </li>
                         {% endfor %}
                     {% endif %}
@@ -161,6 +163,9 @@
     }, oncancel = restoreInitialSliceRules);
     {% endif %}
     function deleteRule(item) {
+        details_container = document.getElementById('details-container');
+        if (!details_container.classList.contains('editing'))
+            return;
         item.classList.add('deleted');
         setTimeout(() => {
             item.remove();
@@ -190,7 +195,7 @@
                         ${ports.map(port => `<span class="badge bg-info">${port}</span>`).join('')}
                     </div>
                 </div>
-                <div class="delete-list-item" title="Remove" onclick="deleteRule(this.parentNode)"><i class="bi bi-x"></i></div>
+                <div class="delete-list-item" onclick="deleteRule(this.parentNode)"><i class="bi bi-x"></i></div>
             `;
             servicesList.appendChild(newItem);
         }, service_ports);
@@ -210,7 +215,7 @@
             newItem.innerHTML = `
                 <div class="d-flex align-items-center">
                     <span class="badge bg-info" style="font-size: 1em;">${protocol}</span>
-                    <span class="delete-list-item" title="Remove" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
+                    <span class="delete-list-item" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
                 </div>
             `;
             protocolsList.appendChild(newItem);
@@ -231,7 +236,7 @@
             newItem.innerHTML = `
                 <div class="d-flex align-items-center">
                     <span class="badge bg-info" style="font-size: 1em;">${port}</span>
-                    <span class="delete-list-item" title="Remove" onclick="deleteRule(parentNode.parentNode)"><i class="bi bi-x"></i></span>
+                    <span class="delete-list-item" onclick="deleteRule(parentNode.parentNode)"><i class="bi bi-x"></i></span>
                 </div>
             `;
             portsList.appendChild(newItem);

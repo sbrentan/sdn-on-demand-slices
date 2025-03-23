@@ -341,6 +341,7 @@ button.cancel-btn::after{
 #add-port-btn,
 div.details-container .delete-list-item{
     opacity: 0;
+    cursor: default;
     transition: opacity 0.2s ease;
 }
 div.details-container.editing #add-service-btn,
@@ -348,6 +349,7 @@ div.details-container.editing #add-protocol-btn,
 div.details-container.editing #add-port-btn,
 div.details-container.editing .delete-list-item {
     opacity: 1;
+    cursor: pointer;
 }
 
 #addProtocolForm, #addPortForm {

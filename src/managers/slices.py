@@ -1,3 +1,4 @@
+import json
 import logging
 
 from common import Network, Connection, Slice, Protocol, NodeType
@@ -20,7 +21,7 @@ class SlicesManager:
                 "allowed_services": {
                     "10.0.0.3": [9999, 9998],
                 },
-                "allowed_ports": [9999, 9998],
+                # "allowed_ports": [9999, 9998],
                 "allowed_protocols": [Protocol.UDP.value],
             }),
             # Slice(id="slice2", switches=["s1", "s3", "s4"], hosts=["h2", "h4"], bandwidth=1000, rules={
@@ -42,6 +43,11 @@ class SlicesManager:
         link_to_slice_dict = SliceUtils.get_link_to_slice_dict()
         logging.info("link_to_slice dicts: " + str(link_to_slice_dict))
         self.network.link_to_slice_dict = link_to_slice_dict
+
+        # print all slices to dict
+        slices_to_print = {s.id: s.to_dict() for s in self.network.slices}
+        logging.info(f"Slices: {json.dumps(slices_to_print, indent=4)}")
+
 
     def enable_slice(self, slice: Slice):
         slice.active = True

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+import logging
 from typing import List, Optional
 from enum import Enum
 from dataclasses import dataclass
@@ -56,6 +57,15 @@ class Slice:
 
     name: Optional[str] = None
 
+    @property
+    def rules_dict(self) -> dict:
+        def serialize(obj):
+            if isinstance(obj, Protocol):
+                return obj.value
+            raise TypeError(f"Type {type(obj)} not serializable")
+
+        return json.loads(json.dumps(self.rules, default=serialize))
+
     @staticmethod
     def get_slice_id(slice: Optional[Slice] = None) -> str:
         if slice:
@@ -65,14 +75,14 @@ class Slice:
     def is_protocol_valid(self, pkt_protocol: Protocol) -> bool:
         if not self.active:
             return False
-        if self.rules["allowed_protocols"] is None:
+        if not self.rules["allowed_protocols"]:
             return True
         return pkt_protocol in self.rules["allowed_protocols"]
 
     def is_port_valid(self, pkt_protocol: Protocol, pkt: Packet) -> bool:
         if not self.active:
             return False
-        if self.rules["allowed_ports"] is None:
+        if not self.rules["allowed_ports"]:
             return True
         if pkt_protocol == Protocol.ICMP:
             return True
@@ -84,51 +94,24 @@ class Slice:
         elif pkt_protocol == Protocol.UDP:
             udp_header = pkt.get_protocol(udp.udp)
             if udp_header is None:
+                logging.info("No UDP header found")
                 return False
             port = udp_header.dst_port  # type: ignore
         else:
             return False
+        logging.info(f"Checking port {port}")
         return port in self.rules["allowed_ports"]
 
     def __post_init__(self):
         if not self.name:
             self.name = self.id
-        # Validate rules
-        if "allowed_protocols" not in self.rules:
-            self.rules["allowed_protocols"] = None  # If none, no rule is enforced
-        else:
-            if not isinstance(self.rules["allowed_protocols"], list):
-                raise ValueError("Invalid allowed protocols")
-            for idx, p in enumerate(self.rules["allowed_protocols"]):
-                if p not in Protocol.all():
-                    raise ValueError(f"Invalid protocol {p}")
-                self.rules["allowed_protocols"][idx] = Protocol(p)
-        if "allowed_ports" not in self.rules:
-            self.rules["allowed_ports"] = None  # If none, no rule is enforced
-
-        if "allowed_services" not in self.rules:
-            self.rules["allowed_services"] = None
-        else:
-            # check structure is valid: {host ip: [port]}
-            if not isinstance(self.rules["allowed_services"], dict):
-                raise ValueError("Invalid allowed services")
-            for host_ip, ports in self.rules["allowed_services"].items():
-                if not isinstance(host_ip, str):
-                    raise ValueError("Invalid host IP")
-                if not isinstance(ports, list):
-                    raise ValueError("Invalid ports")
-                for port in ports:
-                    if not isinstance(port, int):
-                        raise ValueError("Invalid port")
-        
-        if not any([self.rules[r] for r in self.rules]):
-            raise ValueError("No rules specified")
+        self._validate_rules()
 
     def to_dict(self) -> dict:
         return {
             "id": self.id,
             "name": self.name,
-            "rules": self.rules,
+            "rules": self.rules_dict,
             "nodes": self.switches + self.hosts,
             "active": self.active,
             "min_rate": self.min_rate,
@@ -146,7 +129,7 @@ class Slice:
         self.active = bool(data["active"]) if "active" in data else self.active
         self.min_rate = data["min_rate"] if "min_rate" in data else self.min_rate
         self.max_rate = data["max_rate"] if "max_rate" in data else self.max_rate
-        # TODO: call self.__post_init__() to validate rules??
+        self._validate_rules()
 
     @staticmethod
     def from_dict(data: dict) -> Slice:
@@ -162,6 +145,67 @@ class Slice:
         if "name" in data:
             slice.name = data["name"]
         return slice
+    
+    def _validate_rules(self):
+        if "allowed_protocols" not in self.rules:
+            self.rules["allowed_protocols"] = None  # If none, no rule is enforced
+        else:
+            if not isinstance(self.rules["allowed_protocols"], list):
+                raise ValueError("Invalid allowed protocols")
+            for idx, p in enumerate(self.rules["allowed_protocols"]):
+                if isinstance(p, Protocol):
+                    if p not in Protocol.all():
+                        raise ValueError(f"Invalid protocol {p}")
+                elif isinstance(p, str):
+                    if p not in [p.value for p in Protocol]:
+                        raise ValueError(f"Invalid protocol {p}")
+                    self.rules["allowed_protocols"][idx] = Protocol(p)
+                else:
+                    raise ValueError(f"Invalid protocol {p}")
+        if "allowed_ports" not in self.rules:
+            self.rules["allowed_ports"] = None  # If none, no rule is enforced
+        else:
+            if not isinstance(self.rules["allowed_ports"], list):
+                raise ValueError("Invalid allowed ports")
+            new_ports = []
+            for port in self.rules["allowed_ports"]:
+                new_port = port
+                if isinstance(port, str):
+                    try:
+                        new_port = int(port)
+                    except ValueError:
+                        raise ValueError(f"Invalid port {port}")
+                if not isinstance(new_port, int):
+                    raise ValueError(f"Invalid port {port}")
+                new_ports.append(new_port)
+            self.rules["allowed_ports"] = new_ports
+
+        if "allowed_services" not in self.rules:
+            self.rules["allowed_services"] = None
+        else:
+            # check structure is valid: {host ip: [port]}
+            if not isinstance(self.rules["allowed_services"], dict):
+                raise ValueError("Invalid allowed services")
+            for host_ip, ports in self.rules["allowed_services"].items():
+                if not isinstance(host_ip, str):
+                    raise ValueError(f"Invalid host IP {host_ip}")
+                if not isinstance(ports, list):
+                    raise ValueError(f"Invalid ports for host {host_ip}")
+                new_ports = []
+                for port in ports:
+                    new_port = port
+                    if isinstance(port, str):
+                        try:
+                            new_port = int(port)
+                        except ValueError:
+                            raise ValueError(f"Invalid port {port}")
+                    if not isinstance(new_port, int):
+                        raise ValueError(f"Invalid port {port}")
+                    new_ports.append(new_port)
+                self.rules["allowed_services"][host_ip] = new_ports
+        
+        if not any([self.rules[r] for r in self.rules]):
+            raise ValueError("No rules specified")
     
     def __repr__(self) -> str:
         return f"Slice({self.id}) - Switches: {self.switches} - Hosts: {self.hosts}"

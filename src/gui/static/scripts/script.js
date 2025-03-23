@@ -1,5 +1,5 @@
-const API_BASE_URL = 'http://localhost:8080/api';
-const GUI_BASE_URL = 'http://localhost:8080/gui/';
+const API_BASE_URL = 'http://localhost:8086/api';
+const GUI_BASE_URL = 'http://localhost:8086/gui/';
 
 /* ---------------------- Global variables ---------------------- */
 
@@ -658,13 +658,18 @@ function makeEditable(details_selector, onconfirm=undefined, oncancel=undefined)
                         btn.classList.remove('editing');
                         // remove editing class from closest parent with class details-container
                         btn.closest('.details-container').classList.remove('editing');
-                        // btn.style.backgroundColor = ''; // Reset to default color
 
                         // Remove cancel button
                         const cancelButton = details.querySelector('.cancel-btn');
                         if (cancelButton) {
                             cancelButton.remove();
                         }
+
+                        // Remove titles from delete buttons
+                        details.querySelectorAll('.delete-list-item').forEach(deleteButton => {
+                            deleteButton.removeAttribute('title');
+                        });
+
                         window.location.reload();
                     });
                 }
@@ -681,7 +686,6 @@ function makeEditable(details_selector, onconfirm=undefined, oncancel=undefined)
                 btn.classList.add('editing');
                 // add editing class to closest parent with class details-container
                 btn.closest('.details-container').classList.add('editing');
-                // btn.style.backgroundColor = '#ffc107'; // Change to a warning color
 
                 // Create and append cancel button
                 const cancelButton = document.createElement('button');
@@ -689,6 +693,11 @@ function makeEditable(details_selector, onconfirm=undefined, oncancel=undefined)
                 cancelButton.className = 'cancel-btn btn btn-secondary ml-2';
                 cancelButton.setAttribute('style', "width: 100%; margin: 5px 0 !important;")
                 btn.insertAdjacentElement('afterend', cancelButton);
+
+                // Add titles to delete buttons
+                details.querySelectorAll('.delete-list-item').forEach(deleteButton => {
+                    deleteButton.setAttribute('title', 'Remove');
+                });
 
                 cancelButton.addEventListener('click', function() {
                     // Reset form inputs
@@ -704,10 +713,14 @@ function makeEditable(details_selector, onconfirm=undefined, oncancel=undefined)
                     btn.classList.remove('editing');
                     // remove editing class from closest parent with class details-container
                     btn.closest('.details-container').classList.remove('editing');
-                    // btn.style.backgroundColor = ''; // Reset to default color
 
                     // Remove cancel button
                     cancelButton.remove();
+                    
+                    // Remove titles from delete buttons
+                    details.querySelectorAll('.delete-list-item').forEach(deleteButton => {
+                        deleteButton.removeAttribute('title');
+                    });
 
                     if (oncancel) {
                         oncancel();
@@ -763,7 +776,7 @@ function restoreInitialSliceRules() {
         newItem.innerHTML = `
             <div class="d-flex align-items-center">
                 <span class="badge bg-info" style="font-size: 1em;">${protocol}</span>
-                <span class="delete-list-item" title="Remove" onclick="this.parentNode.parentNode.classList.add('deleted')"><i class="bi bi-x"></i></span>
+                <span class="delete-list-item" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
             </div>
         `;
         protocolsList.appendChild(newItem);
@@ -779,7 +792,7 @@ function restoreInitialSliceRules() {
         newItem.innerHTML = `
             <div class="d-flex align-items-center">
                 <span class="badge bg-info" style="font-size: 1em;">${port}</span>
-                <span class="delete-list-item" title="Remove" onclick="this.parentNode.parentNode.classList.add('deleted')"><i class="bi bi-x"></i></span>
+                <span class="delete-list-item" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
             </div>
         `;
         portsList.appendChild(newItem);
@@ -800,7 +813,7 @@ function restoreInitialSliceRules() {
                     ${ports.map(port => `<span class="badge bg-info">${port}</span>`).join('')}
                 </div>
             </div>
-            <div class="delete-list-item" title="Remove" onclick="this.parentNode.classList.add('deleted')"><i class="bi bi-x"></i></div>
+            <div class="delete-list-item" onclick="deleteRule(this.parentNode)"><i class="bi bi-x"></i></div>
         `;
         servicesList.appendChild(newItem);
     }

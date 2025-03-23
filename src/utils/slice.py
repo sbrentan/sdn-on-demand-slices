@@ -55,16 +55,19 @@ class SliceUtils:
         if slice.is_protocol_valid(pkt_protocol):
             logging.info("[is_slice_valid_for_pkt] Protocol valid")
         else:
+            logging.info(f"[is_slice_valid_for_pkt] Protocol invalid: {pkt_protocol}")
             return False
 
         if slice.is_port_valid(pkt_protocol, pkt):
             logging.info("[is_slice_valid_for_pkt] Port valid")
         else:
+            logging.info(f"[is_slice_valid_for_pkt] Port invalid: {pkt}. Allowed ports: {slice.rules['allowed_ports']}")
             return False
 
         if SliceUtils.is_services_valid(slice, pkt):
             logging.info("[is_slice_valid_for_pkt] Services valid")
         else:
+            logging.info(f"[is_slice_valid_for_pkt] Services invalid: {pkt}")
             return False
                 
         return True
