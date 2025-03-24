@@ -23,3 +23,4 @@ class FlowPriority(Enum):
     FLOODING = 1
     DEFAULT = 2
     DROP = 3
+    MONITORED_PACKET = 4

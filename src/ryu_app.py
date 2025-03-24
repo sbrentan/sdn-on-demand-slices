@@ -9,11 +9,11 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet.packet import Packet
-from ryu.lib.packet import packet, ethernet, ether_types
+from ryu.lib.packet import packet, ethernet, ether_types, ipv4
 from ryu.app.wsgi import WSGIApplication
 
 from events.topology import TopologyEventHandler
-from managers import NetworkManager, SlicesManager
+from managers import NetworkManager, SlicesManager, MonitoringManager
 from controllers import APIController, GUIController
 from utils import SliceUtils, QueueUtils, TopologyUtils, PacketUtils
 from common import Network, Node, Slice, Protocol, Queue
@@ -50,9 +50,11 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         self.network_manager = NetworkManager(self.network)
         self.build_network_greenlet = None
 
+        self.monitoring_manager = MonitoringManager()
+
         # Register the API and GUI controllers
         wsgi = kwargs['wsgi']
-        wsgi.register(APIController, {"slices_manager": self.slices_manager})
+        wsgi.register(APIController, {"slices_manager": self.slices_manager, "monitoring_manager": self.monitoring_manager})
         wsgi.register(GUIController)
 
         # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
@@ -95,6 +97,16 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         ]
         PacketUtils.add_flow(datapath, FlowPriority.TABLE_MISS.value, match, actions)
 
+        # dscp_value = 32  # TODO: set as a constant
+        match = parser.OFPMatch(eth_type=0x0800, ip_dscp=32 >> 2)  # IPv4 with DSCP 32
+        actions = [
+            parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
+        ]
+        priority = FlowPriority.MONITORED_PACKET.value
+        logging.info(f"Adding flow with priority {priority} and match {match}")
+        PacketUtils.add_flow(datapath, priority, match, actions)
+
+
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER) # type: ignore
     def _packet_in_handler(self, ev):
         if self.build_network_greenlet:
@@ -106,9 +118,18 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
 
+        is_monitored_packet = False
+        # TODO: skip add flows when registering packets for monitoring
+        ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
+        if ipv4_pkt:
+            dscp_value = (ipv4_pkt.tos)  # Extract DSCP from TOS field
+            logging.info("Received IPv4 packet with DSCP value %d", dscp_value)
+
+            is_monitored_packet = dscp_value == 32  # Filter DSCP-tagged packets
+
         if eth.ethertype != ether_types.ETH_TYPE_IP: # type: ignore
             return
-
+        
         src = eth.src  # type: ignore
         dst = eth.dst  # type: ignore
         dpid = datapath.id
@@ -132,6 +153,14 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
             logging.error("[ERROR] Could not find in_connection for switch %s port %s", switch_id, in_port)
             return
         logging.info(f"Incoming connection: {in_connection}")
+
+        if is_monitored_packet:
+            if in_connection.is_host_connection:
+                logging.info("Packet is monitored and is a host connection, adding additional registered step")
+                host_node = Network.get_instance().nodes[Node.get_host_id(in_connection.host_mac)]
+                self.monitoring_manager.add_recording_step(host_node, pkt)
+            switch_node = Network.get_instance().nodes[Node.get_switch_id(datapath.id)]
+            self.monitoring_manager.add_recording_step(switch_node, pkt)
 
         # for each slice, set the mac to port for the incoming port
         slices = SliceUtils.get_slices_from_packet(switch_id, pkt, in_connection)
@@ -189,6 +218,11 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                 if connection.is_host_connection and connection.host_mac == dst:
                     priority = FlowPriority.DEFAULT.value
                     logging.info("Packet reached final destination, setting priority to DEFAULT")
+                    is_udp = pkt.get_protocol(ipv4.ipv4).proto == Protocol.UDP.protocol_id
+                    if is_udp and is_monitored_packet:
+                        logging.info("Packet is monitored and is a host connection, adding additional registered step")
+                        host_node = Network.get_instance().nodes[Node.get_host_id(connection.host_mac)]
+                        self.monitoring_manager.add_recording_step(host_node, pkt)
             PacketUtils.add_flow(datapath, priority, match, actions)
             
             # flood the packet to all specified connections (after adding flows) 

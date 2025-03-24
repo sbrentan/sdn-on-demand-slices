@@ -4,13 +4,10 @@ cd "$(dirname "$0")/src"
 
 module_path="$(pwd)"
 
-echo "Module path: $module_path"
-
 export PYTHONIOENCODING=UTF-8
 
 if [[ ":$PYTHONPATH:" != *":$module_path:"* ]]; then
     export PYTHONPATH="${PYTHONPATH:+"$PYTHONPATH:"}$module_path"
-    echo $PYTHONPATH
 fi
 
 # clean up logs, create if doesn't exist

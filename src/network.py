@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import time
+import requests
 from mininet.log import setLogLevel, output
 from mininet.topo import Topo
 from mininet.net import Mininet
@@ -8,7 +9,9 @@ from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.cli import CLI
 from mininet.link import TCLink
 
-from common.constants import DEBUG
+from common.paths import ApiPaths
+from common.constants import DEBUG, CONTROLLER_IP, CONTROLLER_PORT
+from bandwidth_tests import BandwidthTest
 import logging
 
 # Configure logging to remove duplicate logs
@@ -81,8 +84,8 @@ class CustomCLI(CLI):
     def preloop(self):
         """Executed before entering the CLI loop."""
         if self.first_cmd:
-            self.wait_for_nodes()
             self.first_cmd = False
+            self.wait_for_nodes()
 
     def wait_for_nodes(self):
         """Wait until all nodes are correctly set up and available."""
@@ -113,21 +116,58 @@ class CustomCLI(CLI):
     def do_bwtest(self, line):
         """
         Custom command to perform bandwidth tests.
-        Usage: slice <test_id>
+        Usage: bwtest <test_id>
         """
+        valid_test_ids = BandwidthTest.get_test_ids()
         test_id = line.strip()
         if not test_id or not test_id.isdigit():
-            output("Please provide a valid test ID.\n")
+            output(f"Please provide a valid test ID from {valid_test_ids}\n")
             return
         output("Performing bandwidth test %s...\n" % test_id)
-        # h3 iperf -s -u -p 9999 -b 10M -t 30 & (start listening on h3 as server in background for around 30s)
-        # h1 iperf -c 10.0.0.3 -u -p 9999 -b 10M -t 10 -i 1 (start sending on h1 as a client, 10 times with interval 1s)
-        server = self.mn.getNodeByName("h3")
-        client = self.mn.getNodeByName("h1")
-        # server.cmd("iperf -s -u -p 9999 -b 10M -t 30 &")
-        # client.cmd("iperf -c 10.0.0.3 -u -p 9999 -b 10M -t 10 -i 1")
-        result = self.mn.iperf((client, server), l4Type='UDP', udpBw='10M', seconds=10, port=9999)
-        output(f"Bandwidth test result: {result}\n")
+        BandwidthTest.run_test(test_id, self.mn, line)
+        return
+
+    def do_reset(self, line):
+        """Custom command to reset the network flows and queues."""
+        output("Resetting network flows and queues...\n")
+        # TODO: use constants
+        # rest api query to reset network
+        result = requests.get(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RESET_SLICES()}")
+        if result.status_code != 204 and result.status_code != 200:
+            output("Error resetting network flows and queues\n")
+            return
+        output("Network flows and queues reset successfully\n")
+        return
+    
+    def do_trace(self, line):
+        """
+        Custom command to trace a packet.
+        Usage: trace <protocol> 
+        """
+        # TODO: add more params and logs
+        protocol = line.strip()
+        if not protocol or protocol.upper() not in ["TCP", "UDP"]:
+            output("Please provide a valid protocol\n")
+            return
+        
+        # TODO: use constants
+        response = requests.post(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RECORDINGS()}")
+        
+        recording_id = response.json()["recording_id"]
+
+        # run python script inside node h1
+        h1 = self.mn.get("h1")
+        h1.sendCmd(f"python3 commands/send_packet.py -ip 10.0.0.3 -t {protocol} -p 9999")
+        self.waitForNode( h1 )
+
+        time.sleep(2)
+
+        # api request to retrieve packet recording
+        response = requests.get(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RECORDING(recording_id)}")
+        
+        steps = response.json()
+        output("\n***\n"+" -> ".join([step.get("name") for step in steps])+ "\n***\n")
+
 
     def default(self, line):
         """Fallback to the default CLI behavior for unrecognized commands."""

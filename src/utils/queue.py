@@ -1,4 +1,7 @@
-import httpx, json, time, logging
+import json
+import time
+import httpx
+import logging
 from typing import Dict, List, Tuple
 
 from ryu.lib import dpid as dpid_lib

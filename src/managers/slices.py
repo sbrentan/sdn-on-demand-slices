@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Optional
 
 from common import Network, Connection, Slice, Protocol, NodeType
 from utils import QueueUtils, PacketUtils, SliceUtils
@@ -28,7 +29,7 @@ class SlicesManager:
             #     "allowed_protocols": [Protocol.TCP.value],
             # }),
             Slice(id="slice3", switches=[S[0], S[2], S[3]], hosts=[H[0], H[1], H[2], H[3]], min_rate=1000, max_rate=1000, rules={
-                "allowed_protocols": [Protocol.ICMP.value],
+                "allowed_protocols": [Protocol.ICMP.value, Protocol.TCP.value],
             }),
         ]
         logging.info("slices: " + str(self.network.slices))
@@ -64,12 +65,16 @@ class SlicesManager:
         self.network.slices.remove(slice)
         self.init_slices()
 
-    def _reset_switches_for_slice(self, slice: Slice):
+    def update_slice(self, slice: Optional[Slice] = None):
+        self._reset_switches_for_slice(slice)
+        self.init_slices()
+
+    def _reset_switches_for_slice(self, slice: Optional[Slice] = None):
         link_to_slice_dict = SliceUtils.get_link_to_slice_dict(skip_active_slices=False)
         affected_switches = {}
         for connection in self.network.connections:
             connection_id = Connection.get_link_id(connection)
-            if slice.id in [s.id for s in link_to_slice_dict[connection_id]]:
+            if not slice or slice.id in [s.id for s in link_to_slice_dict[connection_id]]:
                 if connection.src[1].node_type == NodeType.SWITCH:
                     affected_switches[connection.src[1].node_id] = connection.src[1].node_ref
                 if connection.dst[1].node_type == NodeType.SWITCH:

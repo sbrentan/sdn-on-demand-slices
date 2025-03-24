@@ -3,10 +3,9 @@ from typing import Union
 
 from webob import Response
 from ryu.app.wsgi import ControllerBase, route
-from ryu.topology.switches import Switch, Host
 
-from common import Node, Slice, ApiPaths, Network
-from managers.slices import SlicesManager
+from common import Slice, ApiPaths, Network
+from managers import SlicesManager, MonitoringManager
 from utils import SliceUtils
 
 
@@ -17,6 +16,8 @@ class APIController(ControllerBase):
         self.network = Network.get_instance()
 
         self.slices_manager: SlicesManager = data['slices_manager']
+        self.monitoring_manager: MonitoringManager = data['monitoring_manager']
+        
 
     def _json_response(self, data: Union[dict, list, None] = None, status: str = "200 OK") -> Response:
         if data:
@@ -76,6 +77,12 @@ class APIController(ControllerBase):
         # TODO: reset queues of affected switches
 
         return self._json_response(status="201 Created")
+    
+    @route('reset_slices', ApiPaths.RESET_SLICES(), methods=['GET'])
+    def reset_slices(self, req, **kwargs):
+        """REST endpoint to reset all slices."""
+        self.slices_manager.update_slice()
+        return self._json_response(status="204 No Content")
 
     @route('update_slice', ApiPaths.SLICE(), methods=['PUT'])
     def update_slice(self, req, slice_id, **kwargs):
@@ -234,3 +241,34 @@ class APIController(ControllerBase):
             "target": link.dst[1].name,
             "slices": [s.to_dict() for s in link_to_slice_dict[link_id]]
         })
+
+
+    # ====================================== MONITORING ====================================== #
+
+    @route('new_recording', ApiPaths.RECORDINGS(), methods=['POST'])
+    def new_recording(self, req, **kwargs):
+        """REST endpoint to create a new recording."""
+        recording_id = self.monitoring_manager.new_recording()
+        return self._json_response(status="201 Created", data={"recording_id": recording_id})
+    
+    @route('get_recording', ApiPaths.RECORDING(), methods=['GET'])
+    def get_recording(self, req, recording_id, **kwargs):
+        """REST endpoint to get the details of a specific recording."""
+        try:
+            recording_id = int(recording_id)
+        except Exception as e:
+            logging.error(f"Error getting recording: {e}")
+            return self._json_response(status="400 Bad Request")
+        try:
+            recording = self.monitoring_manager.get_recording(recording_id)
+        except ValueError as e:
+            logging.error(f"Error getting recording: {e}")
+            return self._json_response(status="404 Not Found")
+        
+        data = []
+        for node, packet in recording:
+            data.append(node.to_dict())
+            for protocol in packet.protocols:
+                logging.info(f"Protocol: {protocol}")
+                
+        return self._json_response(data=data)

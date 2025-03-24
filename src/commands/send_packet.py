@@ -62,20 +62,31 @@ try:
         # Create a UDP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+        dscp_value = 32  # TODO: take from constants
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_TOS, dscp_value)
+
         # Send a single packet
         sock.sendto(b"UDP message", (destination_ip, destination_port))
     elif protocol == "TCP":
 
         # Create a TCP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
+        dscp_value = 32  # TODO: take from constants
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_TOS, dscp_value)
 
         # Connect to the server
-        sock.connect((destination_ip, destination_port))
+        try:
+            sock.connect((destination_ip, destination_port))
 
-        # Send a single packet
-        sock.sendall(b"TCP message")
+            # Send a single packet
+            sock.sendall(b"TCP message")
+        except ConnectionRefusedError:
+            print("- Connection refused by the server")
 except Exception as e:
-    print(f"Error: {e}")
+    import traceback
+    print("Error:", e)
+    traceback.print_exc()
 finally:
     # Close the socket
     if sock:
