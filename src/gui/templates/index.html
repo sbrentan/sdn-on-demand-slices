@@ -19,12 +19,14 @@
         <script src="{{ Paths.STATIC('scripts/add_service_modal.js') }}"></script>
         <script src="{{ Paths.STATIC('scripts/add_protocol_modal.js') }}"></script>
         <script src="{{ Paths.STATIC('scripts/add_port_modal.js') }}"></script>
+        <script src="{{ Paths.STATIC('scripts/monitoring.js') }}"></script>
     </head>
     <body>
 
         {{ include('modals/add_service') }}
         {{ include('modals/add_protocol') }}
         {{ include('modals/add_port') }}
+        {{ include('modals/send_packet') }}
 
         <div id="request-indicator" class="spinner-overlay">
             <div class="spinner-border text-primary" role="status">
@@ -32,6 +34,9 @@
             </div>
         </div>
         <h1 id="title" class="display-5 text-center my-4">SDN On-Demand Slices</h1>
+        <div class="d-flex justify-content-center actions-buttons">
+            <button type="button" id="send-packet-btn" class="btn mx-2">Send Packet</button>
+        </div>
         <div id="app">
             <!-- <h1>Network Topology</h1> -->
             <div id="sidebar" class="card mb-3">

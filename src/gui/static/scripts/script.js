@@ -315,6 +315,61 @@ function renderGraph(data, slices) {
     });
 }
 
+/**
+ * Animate a packet along a series of nodes using an image.
+ * @param {Array} steps - An array of node IDs representing the path, e.g. ['h1', 's1', 's2', 'h2'].
+ * @param {Number} duration - Duration (in ms) for each transition between nodes.
+ */
+function animatePacketPath(steps, duration = 800) {
+    const svg = d3.select("#network-graph");
+
+    const PACKET_SIZE = 40;
+
+    // Create a packet image element
+    const packet = svg.append("image")
+        .attr("href", "/gui/static/images/packet.png")
+        .attr("width", PACKET_SIZE)
+        .attr("height", PACKET_SIZE)
+        .attr("opacity", 1);
+
+    // Helper: get node data by id
+    function getNodeById(id) {
+        return graph_data.nodes.find(node => node.id === id);
+    }
+
+    // Start at the first node in the path
+    let startNode = getNodeById(steps[0]);
+    if (!startNode) {
+        console.error("Starting node not found:", steps[0]);
+        return;
+    }
+    packet.attr("x", startNode.x - PACKET_SIZE / 2)
+          .attr("y", startNode.y - PACKET_SIZE / 2);
+
+    // Recursive function to animate packet through steps
+    function moveToStep(index) {
+        if (index >= steps.length) {
+            packet.transition().duration(500).style("opacity", 0).remove();
+            return;
+        }
+        let nextNode = getNodeById(steps[index]);
+        if (!nextNode) {
+            console.error("Node not found for step:", steps[index]);
+            return;
+        }
+        packet.transition()
+            .duration(duration)
+            .attr("x", nextNode.x - PACKET_SIZE / 2)
+            .attr("y", nextNode.y - PACKET_SIZE / 2)
+            .on("end", () => moveToStep(index + 1));
+    }
+
+    // Begin the animation from the second step (index 1)
+    moveToStep(1);
+}
+
+
+
 /* ----------------------- New Slice Management ----------------------- */
 
 // Start new slice creation mode

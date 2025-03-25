@@ -34,8 +34,6 @@ class ApiPaths(Paths, BASE_URL=API_BASE_URL):
     ACTIVATE_SLICE = '/slices/{slice_id}/activate'
     DEACTIVATE_SLICE = '/slices/{slice_id}/deactivate'
     RESET_SLICES = '/reset/slices'
-    RECORDINGS = '/recordings'
-    RECORDING = '/recordings/{recording_id}'
     TOPOLOGY = '/topology'
     NODES = '/topology/nodes'
     SWITCHES = '/topology/switches'
@@ -44,6 +42,12 @@ class ApiPaths(Paths, BASE_URL=API_BASE_URL):
     HOST = '/topology/hosts/{host_id}'
     LINKS = '/topology/links'
     LINK = '/topology/links/{link_id}'
+    RECORDINGS = '/monitoring/recordings'
+    RECORDING = '/monitoring/recordings/{recording_id}'
+    SEND_PACKET = '/monitoring/send/packet'
+    PACKET = '/monitoring/packet'
+    PACKET_RESULT = '/monitoring/packet/{packet_id}'
+
 
 
 class GuiPaths(Paths, BASE_URL=GUI_BASE_URL):

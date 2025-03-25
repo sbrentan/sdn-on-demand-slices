@@ -19,7 +19,6 @@ function openProtocolsModal(callback, protocols) {
 			alert('This protocol is already in use.');
 			return;
 		}
-		// Construct IP from the four inputs
 		var protocol = $('#protocol_select').val();
 		
 		$('#protocolsModal').modal('hide');

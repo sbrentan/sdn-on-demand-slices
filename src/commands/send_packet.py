@@ -3,6 +3,8 @@ import argparse
 import subprocess
 import re
 
+# TODO: manage ICMP packet
+
 def get_host_ip_from_ifconfig():
     """Get the IP address of the host using the ifconfig command."""
     try:

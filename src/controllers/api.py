@@ -10,6 +10,7 @@ from utils import SliceUtils
 
 
 class APIController(ControllerBase):
+
     def __init__(self, req, link, data, **config):
         super(APIController, self).__init__(req, link, data, **config)
 
@@ -17,7 +18,6 @@ class APIController(ControllerBase):
 
         self.slices_manager: SlicesManager = data['slices_manager']
         self.monitoring_manager: MonitoringManager = data['monitoring_manager']
-        
 
     def _json_response(self, data: Union[dict, list, None] = None, status: str = "200 OK") -> Response:
         if data:
@@ -78,7 +78,7 @@ class APIController(ControllerBase):
 
         return self._json_response(status="201 Created")
     
-    @route('reset_slices', ApiPaths.RESET_SLICES(), methods=['GET'])
+    @route('reset_slices', ApiPaths.RESET_SLICES(), methods=['POST'])
     def reset_slices(self, req, **kwargs):
         """REST endpoint to reset all slices."""
         self.slices_manager.update_slice()
@@ -245,6 +245,63 @@ class APIController(ControllerBase):
 
     # ====================================== MONITORING ====================================== #
 
+    @route('send_packet', ApiPaths.SEND_PACKET(), methods=['POST'])
+    def send_packet(self, req, **kwargs):
+        """REST endpoint to send a packet."""
+        try:
+            packet_data = json.loads(req.body)
+        except Exception as e:
+            logging.error(f"Error sending packet: {e}")
+            return self._json_response(status="400 Bad Request")
+        packet_id = self.monitoring_manager.send_packet(packet_data)
+        logging.info(f"Sending packet: {packet_data} with id {packet_id}")
+        return self._json_response(status="201 Created", data={"packet_id": packet_id})
+    
+    @route('get_packet', ApiPaths.PACKET(), methods=['GET'])
+    def get_packet(self, req, **kwargs):
+        """REST endpoint to get the details of a specific packet."""
+        if self.monitoring_manager.active_packet:
+            try:
+                packet = self.monitoring_manager.get_packet()
+                packet.update({"status": "available"})
+            except ValueError as e:
+                logging.error(f"Error getting packet: {e}")
+                return self._json_response(status="404 Not Found")
+        else:
+            packet = {"status": "no_packets"}
+        return self._json_response(data=packet)
+    
+    @route('get_packet_result', ApiPaths.PACKET_RESULT(), methods=['GET'])
+    def get_packet_result(self, req, packet_id, **kwargs):
+        """REST endpoint to get the details of a specific packet."""
+        try:
+            if self.monitoring_manager.packet_result_is_available(packet_id):
+                packet_steps = self.monitoring_manager.get_packet_result(packet_id)
+                packet = {"packet_id": packet_id, "steps": packet_steps, "status": "completed"}
+            else:
+                packet = {"status": "pending"}
+        except ValueError as e:
+            logging.error(f"Error getting packet: {e}")
+            return self._json_response(status="404 Not Found")
+        return self._json_response(data=packet)
+     
+    @route('save_packet_result', ApiPaths.PACKET_RESULT(), methods=['POST'])
+    def save_packet_result(self, req, packet_id, **kwargs):
+        """REST endpoint to save the result of a packet."""
+        import traceback
+        try:
+            packet_result = json.loads(req.body)
+        except Exception as e:
+            logging.error(f"Error saving packet result: {e}")
+            logging.error(traceback.format_exc())
+            return self._json_response(status="400 Bad Request")
+        try:
+            self.monitoring_manager.save_packet_result(packet_id, packet_result)
+        except ValueError as e:
+            logging.error(f"Error saving packet result: {e}")
+            return self._json_response(status="404 Not Found")
+        return self._json_response(status="201 Created")
+    
     @route('new_recording', ApiPaths.RECORDINGS(), methods=['POST'])
     def new_recording(self, req, **kwargs):
         """REST endpoint to create a new recording."""
@@ -268,7 +325,7 @@ class APIController(ControllerBase):
         data = []
         for node, packet in recording:
             data.append(node.to_dict())
-            for protocol in packet.protocols:
-                logging.info(f"Protocol: {protocol}")
+            # for protocol in packet.protocols:
+            #     logging.info(f"Protocol: {protocol}")
                 
         return self._json_response(data=data)

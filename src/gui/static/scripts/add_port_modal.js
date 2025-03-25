@@ -15,7 +15,6 @@ function openPortsModal(callback) {
             alert('Please enter a valid port number between 1 and 65535.');
             return;
         }
-		// Construct IP from the four inputs
 		var port = $('#port_input').val();
 		
 		$('#portsModal').modal('hide');

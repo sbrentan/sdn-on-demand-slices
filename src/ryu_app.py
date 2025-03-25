@@ -59,8 +59,6 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
         # port, queue_id = self.mac_to_port[dpid][slice_name][mac]
         self.mac_to_port = {}
-    
-    
 
     def update_topology(self):
         """Abstract method defined in TopologyEventHandler to updated the network topology"""
@@ -218,8 +216,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                 if connection.is_host_connection and connection.host_mac == dst:
                     priority = FlowPriority.DEFAULT.value
                     logging.info("Packet reached final destination, setting priority to DEFAULT")
-                    is_udp = pkt.get_protocol(ipv4.ipv4).proto == Protocol.UDP.protocol_id
-                    if is_udp and is_monitored_packet:
+                    if is_monitored_packet:
                         logging.info("Packet is monitored and is a host connection, adding additional registered step")
                         host_node = Network.get_instance().nodes[Node.get_host_id(connection.host_mac)]
                         self.monitoring_manager.add_recording_step(host_node, pkt)

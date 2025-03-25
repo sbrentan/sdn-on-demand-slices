@@ -1,7 +1,9 @@
 #!/usr/bin/python3
+from typing import Dict
 
 import time
 import requests
+import threading
 from mininet.log import setLogLevel, output
 from mininet.topo import Topo
 from mininet.net import Mininet
@@ -19,6 +21,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger('mininet')
 logger.setLevel(logging.INFO)
 logger.propagate = False  # Disable propagation to avoid duplicate logs
+
+stopping_flag = threading.Event()
 
 
 class NetworkSlicingTopology(Topo):
@@ -72,12 +76,14 @@ class NetworkSlicingTopology(Topo):
             time.sleep(30)
             print("Trying to ping all hosts...")
             net.pingAll()
-        # Using a custom CLI instead of the default one
+
+        # Using a custom CLI instead of the default one to add custom commands
         CustomCLI(net)
         net.stop()
 
 
 class CustomCLI(CLI):
+
     """A custom CLI to add new commands."""
     first_cmd = True
 
@@ -86,6 +92,16 @@ class CustomCLI(CLI):
         if self.first_cmd:
             self.first_cmd = False
             self.wait_for_nodes()
+
+            # Start thread polling apis for packets requests
+            self.polling_thread = threading.Thread(target=poll_apis_for_packets, args=({"mn": self.mn, "cli": self},))
+            self.polling_thread.start()
+
+    def postloop(self):
+        if self.polling_thread.is_alive():
+            stopping_flag.set()
+            self.polling_thread.join()
+        return super().postloop()
 
     def wait_for_nodes(self):
         """Wait until all nodes are correctly set up and available."""
@@ -132,7 +148,7 @@ class CustomCLI(CLI):
         output("Resetting network flows and queues...\n")
         # TODO: use constants
         # rest api query to reset network
-        result = requests.get(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RESET_SLICES()}")
+        result = requests.post(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RESET_SLICES()}")
         if result.status_code != 204 and result.status_code != 200:
             output("Error resetting network flows and queues\n")
             return
@@ -150,28 +166,59 @@ class CustomCLI(CLI):
             output("Please provide a valid protocol\n")
             return
         
-        # TODO: use constants
-        response = requests.post(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RECORDINGS()}")
+        steps = send_packet(self.mn, self, {"protocol": protocol})
         
-        recording_id = response.json()["recording_id"]
-
-        # run python script inside node h1
-        h1 = self.mn.get("h1")
-        h1.sendCmd(f"python3 commands/send_packet.py -ip 10.0.0.3 -t {protocol} -p 9999")
-        self.waitForNode( h1 )
-
-        time.sleep(2)
-
-        # api request to retrieve packet recording
-        response = requests.get(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RECORDING(recording_id)}")
-        
-        steps = response.json()
         output("\n***\n"+" -> ".join([step.get("name") for step in steps])+ "\n***\n")
 
 
     def default(self, line):
         """Fallback to the default CLI behavior for unrecognized commands."""
         return super().default(line)
+    
+
+def send_packet(mn: Mininet, cli: CustomCLI, packet_info: Dict) -> Dict:
+    # TODO: use constants
+    response = requests.post(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RECORDINGS()}")
+    
+    recording_id = response.json()["recording_id"]
+
+    protocol = packet_info.get("protocol")
+
+    # run python script inside node h1
+    h1 = mn.get("h1")
+    h1.sendCmd(f"python3 commands/send_packet.py -ip 10.0.0.3 -t {protocol} -p 9999")
+    # TODO: override output to avoid printing in the console
+    cli.waitForNode(h1)
+
+    time.sleep(1)
+
+    # api request to retrieve packet recording
+    return requests.get(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RECORDING(recording_id)}").json()
+
+
+
+def poll_apis_for_packets(args: Dict):
+    """Poll the APIs for packets requests."""
+    print("Polling APIs for packets requests...")
+    mn = args["mn"]
+    cli = args["cli"]
+    while True and not stopping_flag.is_set():
+        # Poll the API for packets requests
+        time.sleep(1)
+        response = requests.get(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.PACKET()}")
+        # print("polling_result", response.status_code, response.json())
+        if response.status_code == 200:
+            packet_info = response.json()
+            # Send packet to the network
+            if packet_info.get("status") == "available":
+                # Send the packet to the network
+                packet_id = packet_info.get("packet_id")
+                packet_result = send_packet(mn, cli, packet_info)
+                print("packet_result", packet_result)
+                # Save the packet result
+                requests.post(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.PACKET_RESULT(packet_id)}", json=packet_result)
+                
+    print("Stopping polling thread...")
 
 
 if __name__ == "__main__":
