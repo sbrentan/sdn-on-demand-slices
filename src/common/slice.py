@@ -134,11 +134,11 @@ class Slice:
     @staticmethod
     def from_dict(data: dict) -> Slice:
         slice = Slice(
-            id=uuid.uuid4().hex,
-            rules=data["rules"],
-            switches=data["switches"],
-            hosts=data["hosts"],
-            active=bool(data["active"]) if "active" in data else False,
+            id=data.get("id", uuid.uuid4().hex),
+            rules=data.get("rules", {"allowed_protocols": None, "allowed_ports": None, "allowed_services": None}),
+            switches=data.get("switches", []),
+            hosts=data.get("hosts", []),
+            active=str(data.get("active", "True")).upper() == "TRUE" if "active" in data else True,
             min_rate=data.get("min_rate", None),
             max_rate=data.get("max_rate", None)
         )

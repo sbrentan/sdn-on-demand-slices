@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 from typing import Dict, List, Tuple, Optional
@@ -37,14 +38,22 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
     def __init__(self, *args, **kwargs):
         logging.info("Initializing DynamicSlicingController")
         super(DynamicSlicingController, self).__init__(*args, **kwargs)
+
+        slices_dict = {}
+        slices_file = os.getenv("SLICES_FILE")
+        if not slices_file:
+            logging.info("SLICES_FILE environment variable not set, not loading slices")
+        else:
+            logging.info(f"Loading slices from file: {slices_file}")
+            with open(slices_file) as f:
+                slices_dict = json.load(f)
         
         # Increase timeout for OVSDB operations  TODO: remove?
         self.CONF.set_override('ovsdb_timeout', OVSDB_TIMEOUT)
 
         self.network = Network()
 
-        # TODO: Complete the slice manager
-        self.slices_manager = SlicesManager(self.network)
+        self.slices_manager = SlicesManager(self.network, slices_dict)
 
         # Initialize the network handler
         self.network_manager = NetworkManager(self.network)
@@ -331,5 +340,3 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
 
 app_manager.require_app('ryu.app.rest_qos') # Needed for managing queues
 app_manager.require_app('ryu.app.rest_conf_switch') # Needed for updating ovdb address
-
-# app_manager.require_app('ryu.app.rest_topology')

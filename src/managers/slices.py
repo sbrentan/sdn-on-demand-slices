@@ -2,37 +2,19 @@ import json
 import logging
 from typing import Optional
 
-from common import Network, Connection, Slice, Protocol, NodeType
+from common import Network, Connection, Slice, NodeType
 from utils import QueueUtils, PacketUtils, SliceUtils
 
-
-S = ["s1", "s2", "s3", "s4"]
-H = ["00:00:00:00:00:01", "00:00:00:00:00:02", "00:00:00:00:00:03", "00:00:00:00:00:04"]
 
 class SlicesManager:
 
     network: Network
 
-    def __init__(self, network: Network):
+    def __init__(self, network: Network, slices_dict: dict = None):
         self.network = network
     
-        # TODO: read from file ???
-        self.network.slices = [
-            Slice(id="slice1", switches=[S[0], S[1], S[3]], hosts=[H[0], H[2]], min_rate=9000000, max_rate=9000000, rules={
-                "allowed_services": {
-                    "10.0.0.3": [9999, 9998],
-                },
-                # "allowed_ports": [9999, 9998],
-                "allowed_protocols": [Protocol.UDP.value],
-            }),
-            # Slice(id="slice2", switches=["s1", "s3", "s4"], hosts=["h2", "h4"], bandwidth=1000, rules={
-            #     "allowed_protocols": [Protocol.TCP.value],
-            # }),
-            Slice(id="slice3", switches=[S[0], S[2], S[3]], hosts=[H[0], H[1], H[2], H[3]], min_rate=1000, max_rate=1000, rules={
-                "allowed_protocols": [Protocol.ICMP.value, Protocol.TCP.value],
-            }),
-        ]
-        logging.info("slices: " + str(self.network.slices))
+        self.network.slices = [Slice.from_dict(s) for s in slices_dict.get("slices", [])] if slices_dict else []
+        logging.info("Loaded slices from file: " + str(self.network.slices))
 
         self.network.add_update_event(self.init_slices)
         
@@ -48,7 +30,6 @@ class SlicesManager:
         # print all slices to dict
         slices_to_print = {s.id: s.to_dict() for s in self.network.slices}
         logging.info(f"Slices: {json.dumps(slices_to_print, indent=4)}")
-
 
     def enable_slice(self, slice: Slice):
         slice.active = True
@@ -83,7 +64,3 @@ class SlicesManager:
         for switch in affected_switches.values():
             QueueUtils.delete_queues(switch.dp.id)
             PacketUtils.delete_flows(switch)
-
-    # TODO: implement logic for initializing the slices (e.g., default slice templates or from a file)
-    # TODO: move logic for creating, updating, deleting slices from API controller to here
-    # TODO: implement logic for enabling and disabling slices
