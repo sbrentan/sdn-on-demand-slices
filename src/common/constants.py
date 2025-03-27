@@ -8,6 +8,7 @@ CONTROLLER_IP = "localhost"
 CONTROLLER_PORT = 8080
 OVSDB_ADDR = "tcp:127.0.0.1:6632"
 OVSDB_TIMEOUT = 10  # In seconds
+DSCP_TAG_VALUE = 32  # DSCP value for the monitored packet
 NETWORK_MAX_RATE = 10000000000  # In bps (=10 Gbps)
 
 # Base URL Constants

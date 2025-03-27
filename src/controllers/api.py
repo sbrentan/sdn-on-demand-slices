@@ -68,15 +68,15 @@ class APIController(ControllerBase):
         except Exception as e:
             logging.error(f"Error creating slice: {e}")
             return self._json_response(status="400 Bad Request")
-        # TODO: CHECK IF name already exists?
-        # if [s for s in self.network.slices if s.id == slice_data["id"]]:
-        #     logging.error(f"Error creating slice {slice_data['name']}: already exists")
-        #     return self._json_response(status="409 Conflict")
+        new_slice = Slice.from_dict(slice_data)
+        if new_slice.id in self.network.slices:
+            logging.error(f"Error creating slice {slice_data['name']}: ID already exists")
+            return self._json_response(status="409 Conflict")
         self.network.slices.append(Slice.from_dict(slice_data))
 
         # TODO: reset queues of affected switches
 
-        return self._json_response(status="201 Created")
+        return self._json_response(status="201 Created", data=new_slice.to_dict())
     
     @route('reset_slices', ApiPaths.RESET_SLICES(), methods=['POST'])
     def reset_slices(self, req, **kwargs):

@@ -75,7 +75,16 @@ class GUIController(ControllerBase):
     @route('gui', GuiPaths.INDEX(), methods=['GET'])
     def index(self, req, **kwargs):
         """REST endpoint to serve the Index page."""
-        return self.render_template("index")
+        context = {
+            "JS_VARS": {
+                "CONTROLLER_IP": f'"{CONTROLLER_IP}"',
+                "CONTROLLER_PORT": f'"{CONTROLLER_PORT}"',
+                "STATIC_FOLDER": f'"/gui/static"',
+                "ApiPaths": {x: getattr(ApiPaths, x)() for x in dir(ApiPaths) if not x.startswith("__")},
+                "GuiPaths": {x: getattr(GuiPaths, x)() for x in dir(GuiPaths) if not x.startswith("__")}
+            },
+        }
+        return self.render_template("index", context)
     
     @route('switch_details', GuiPaths.SWITCH_DETAILS(), methods=['GET'])
     def switch_details(self, req, switch_id, **kwargs):
@@ -132,7 +141,12 @@ class GUIController(ControllerBase):
     def slice_update(self, req, slice_id, **kwargs):
         """REST endpoint to update a slice."""
         status, response = self.get_data(ApiPaths.SLICE(slice_id), method="PUT", data=req.json)
-        return Response(status=status, body=json.dumps(response))
+        if status != 200:
+            return Response(status=status, body=f"Error while trying to update slice data: {response}")
+        if not response:
+            response = json.dumps(response)
+
+        return Response(status=status, body=response)
     
     @route('switch_update', GuiPaths.SWITCH(), methods=['PUT'])
     def switch_update(self, req, switch_id, **kwargs):

@@ -78,7 +78,6 @@ class CustomCLI(CLI):
     def do_reset(self, line):
         """Custom command to reset the network flows and queues."""
         output("Resetting network flows and queues...\n")
-        # TODO: use constants
         # rest api query to reset network
         result = requests.post(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RESET_SLICES()}")
         if result.status_code != 204 and result.status_code != 200:
@@ -110,7 +109,6 @@ class CustomCLI(CLI):
 
 
 def make_host_send_packet(mn: Mininet, cli: CustomCLI, packet_info: Dict) -> Dict:
-    # TODO: use constants
     response = requests.post(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.RECORDINGS()}")
     
     recording_id = response.json()["recording_id"]
@@ -119,7 +117,7 @@ def make_host_send_packet(mn: Mininet, cli: CustomCLI, packet_info: Dict) -> Dic
 
     # run python script inside node h1
     h1 = mn.get("h1")
-    h1.sendCmd(f"python3 commands/send_packet.py -ip 10.0.0.3 -t {protocol} -p 9999")
+    h1.sendCmd(f"python3 cli/send_packet.py -ip 10.0.0.3 -t {protocol} -p 9999")
     # TODO: override output to avoid printing in the console
     cli.waitForNode(h1)
 

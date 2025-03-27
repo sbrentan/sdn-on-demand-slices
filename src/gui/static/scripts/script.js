@@ -1,5 +1,4 @@
-const API_BASE_URL = 'http://localhost:8086/api';
-const GUI_BASE_URL = 'http://localhost:8086/gui/';
+const BASE_URL = `http://${CONTROLLER_IP}:${CONTROLLER_PORT}`;
 
 /* ---------------------- Global variables ---------------------- */
 
@@ -19,8 +18,6 @@ var outlineFilter = undefined;
 let isCreatingNewSlice = false;
 let newSliceNodes = []; // stores selected node IDs
 let newSliceIdCounter = 0;
-
-// TODO: replace hard-coded urls with ApiPaths methods
 
 /* ----------------------- Onload helper ----------------------- */
 
@@ -46,7 +43,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         li.appendChild(span);
         const sliceText = document.createElement("span");
         sliceText.className = "slice-text";
-        sliceText.textContent = `${slice.name}`; // [${slice.id}]`;
+        sliceText.textContent = `${slice.name}`;
         li.appendChild(sliceText);
         li.dataset.index = index;
         sliceList.appendChild(li);
@@ -249,7 +246,7 @@ function renderGraph(data, slices) {
         .data(data.nodes)
         .enter()
         .append("image")
-        .attr("href", d => d.type === "Host" ? '/gui/static/images/server.png' : '/gui/static/images/switch.png')
+        .attr("href", d => d.type === "Host" ? `${STATIC_FOLDER}/images/server.png` : `${STATIC_FOLDER}/images/switch.png`)
         .attr("width", NODE_SIZE)
         .attr("height", NODE_SIZE)
         .attr("cursor", "pointer")
@@ -266,7 +263,15 @@ function renderGraph(data, slices) {
             d3.select(this)
                 .attr("filter", "url(#outlineFilter)");
     
-            await fetchMenuDetails(`/gui/menu/details/${d.type.toLowerCase()}/${d.id}`);
+            if (d.type === "Host")
+                path = `${GuiPaths.HOST_DETAILS.replace("{host_id}", d.id)}`;
+            else if (d.type === "Switch")
+                path = `${GuiPaths.SWITCH_DETAILS.replace("{switch_id}", d.id)}`;
+            else {
+                console.log("Unknown node type:", d.type);
+                return;
+            }
+            await fetchMenuDetails(path);
         }); 
 
     const label = svg.append("g")
@@ -310,7 +315,7 @@ function renderGraph(data, slices) {
             target.classList.toggle("selected");
             highlightSlice(target, selectedSlice);
 
-            await fetchMenuDetails(`/gui/menu/details/slice/${selectedSlice.id}`);
+            await fetchMenuDetails(`${GuiPaths.SLICE_DETAILS.replace("{slice_id}", selectedSlice.id)}`);
         }
     });
 }
@@ -327,7 +332,7 @@ function animatePacketPath(steps, duration = 800) {
 
     // Create a packet image element
     const packet = svg.append("image")
-        .attr("href", "/gui/static/images/packet.png")
+        .attr("href", `${STATIC_FOLDER}/images/packet.png`)
         .attr("width", PACKET_SIZE)
         .attr("height", PACKET_SIZE)
         .attr("opacity", 1);
@@ -374,7 +379,7 @@ function animatePacketPath(steps, duration = 800) {
 
 // Start new slice creation mode
 async function startNewSlice() {
-    await fetchMenuDetails(`/gui/menu/details/new_slice`);
+    await fetchMenuDetails(`${GuiPaths.NEW_SLICE_DETAILS}`);
     isCreatingNewSlice = true;
     
     newSliceNodes = [];
@@ -480,7 +485,7 @@ async function finalizeNewSlice() {
 
     console.log("New slice:", newSlice);
 
-    await fetchData('slices', 'POST', newSlice, GUI_BASE_URL);
+    await fetchData(`${GuiPaths.SLICES}`, 'POST', newSlice);
     
     // Reset new slice mode and remove temporary event listeners on nodes and links
     isCreatingNewSlice = false;
@@ -593,31 +598,8 @@ function saveLayout() {
 
 /* -------------------------------------------------------------- */
 
-async function fetchComponent(component, method = 'GET') {
-    try {
-        const response = await fetch(GUI_BASE_URL + component, { method });
-        if (!response.ok) {
-            throw new Error(`Error: ${response.status} - ${response.statusText}`);
-        }
-
-        return await response.text();
-    } catch (error) {
-        console.error(`Failed to fetch component ${component}:`, error);
-        throw error;
-    }
-}
-
-async function loadComponent(component, targetId) {
-    try {
-        const componentHtml = await fetchComponent(component);
-        document.getElementById(targetId).innerHTML = componentHtml;
-    } catch (error) {
-        console.error(`Failed to load component ${component}:`, error);
-    }
-}
-
 // Generic function to fetch data from an endpoint
-async function fetchData(endpoint, method = 'GET', body = null, baseUrl = API_BASE_URL) {
+async function fetchData(endpoint, method = 'GET', body = null, baseUrl = BASE_URL) {
     try {
         const options = {
             method,
@@ -645,32 +627,32 @@ async function fetchData(endpoint, method = 'GET', body = null, baseUrl = API_BA
 
 // Fetch slices
 async function getSlices() {
-    return await fetchData('/slices');
+    return await fetchData(`${ApiPaths.SLICES}`);
 }
 
 // Create a new slice
 async function createSlice(sliceData) {
-    return await fetchData('/slices', 'POST', sliceData);
+    return await fetchData(`${ApiPaths.SLICES}`, 'POST', sliceData);
 }
 
 // Update a slice
 async function updateSlice(sliceId, sliceData) {
-    return await fetchData('/slices/' + sliceId, 'PUT', sliceData);
+    return await fetchData(`${ApiPaths.SLICE.replace("{slice_id}", sliceId)}`, 'PUT', sliceData);
 }
 
 // Delete a slice
 async function deleteSlice(sliceId) {
-    return await fetchData('/slices', 'DELETE', { id: sliceId });
+    return await fetchData(`${ApiPaths.SLICES}`, 'DELETE', { id: sliceId });
 }
 
 // Fetch nodes
 async function getNodes() {
-    return await fetchData('/topology/nodes');
+    return await fetchData(`${ApiPaths.NODES}`);
 }
 
 // Fetch links
 async function getLinks() {
-    return await fetchData('/topology/links');
+    return await fetchData(`${ApiPaths.LINKS}`);
 }
 
 /* ----------------------- Editable Forms ----------------------- */

@@ -154,7 +154,7 @@ class Slice:
                 raise ValueError("Invalid allowed protocols")
             for idx, p in enumerate(self.rules["allowed_protocols"]):
                 if isinstance(p, Protocol):
-                    if p not in Protocol.all():
+                    if p.value not in [p.value for p in Protocol]:
                         raise ValueError(f"Invalid protocol {p}")
                 elif isinstance(p, str):
                     if p not in [p.value for p in Protocol]:

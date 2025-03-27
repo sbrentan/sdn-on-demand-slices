@@ -3,6 +3,8 @@ import argparse
 import subprocess
 import re
 
+from common.constants import DSCP_TAG_VALUE
+
 # TODO: manage ICMP packet
 
 def get_host_ip_from_ifconfig():
@@ -64,7 +66,7 @@ try:
         # Create a UDP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-        dscp_value = 32  # TODO: take from constants
+        dscp_value = DSCP_TAG_VALUE
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_TOS, dscp_value)
 
         # Send a single packet
@@ -74,7 +76,7 @@ try:
         # Create a TCP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         
-        dscp_value = 32  # TODO: take from constants
+        dscp_value = DSCP_TAG_VALUE
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_TOS, dscp_value)
 
         # Connect to the server

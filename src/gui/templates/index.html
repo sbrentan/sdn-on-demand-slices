@@ -15,6 +15,12 @@
         <script src="https://unpkg.com/htmx.org@1.7.0"></script>
 
         <link rel="stylesheet" type="text/css" href="{{ Paths.STATIC('css/style.css') }}">
+
+        <script>
+            {% for var in JS_VARS %}
+                var {{ var }} = {{ JS_VARS[var] }};
+            {% endfor %}
+        </script>
         <script src="{{ Paths.STATIC('scripts/script.js') }}"></script>
         <script src="{{ Paths.STATIC('scripts/add_service_modal.js') }}"></script>
         <script src="{{ Paths.STATIC('scripts/add_protocol_modal.js') }}"></script>

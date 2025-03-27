@@ -1,12 +1,11 @@
 async function send_packet(packet_info){
-    // TODO: use apipaths
-    result = await fetchData('/monitoring/send/packet', 'POST', packet_info)
+    result = await fetchData(`${ApiPaths.SEND_PACKET}`, 'POST', packet_info)
     packet_id = result['packet_id']
 
     // in loop, check if packet result is avaialble
     packet_result = null
     while(true){
-        result = await fetchData('/monitoring/packet/' + packet_id, 'GET')
+        result = await fetchData(`${ApiPaths.PACKET_RESULT.replace("{packet_id}", packet_id)}`, 'GET')
         console.log(result)
         if(result['status'] == 'completed'){
             packet_result = result

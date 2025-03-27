@@ -49,7 +49,6 @@ class ApiPaths(Paths, BASE_URL=API_BASE_URL):
     PACKET_RESULT = '/monitoring/packet/{packet_id}'
 
 
-
 class GuiPaths(Paths, BASE_URL=GUI_BASE_URL):
     INDEX = ''
     STATIC = '/static/{filename}'

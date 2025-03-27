@@ -18,7 +18,7 @@ from managers import NetworkManager, SlicesManager, MonitoringManager
 from controllers import APIController, GUIController
 from utils import SliceUtils, QueueUtils, TopologyUtils, PacketUtils
 from common import Network, Node, Slice, Protocol, Queue
-from common.constants import OVSDB_TIMEOUT, FlowPriority
+from common.constants import OVSDB_TIMEOUT, FlowPriority, DSCP_TAG_VALUE
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -48,7 +48,6 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
             with open(slices_file) as f:
                 slices_dict = json.load(f)
         
-        # Increase timeout for OVSDB operations  TODO: remove?
         self.CONF.set_override('ovsdb_timeout', OVSDB_TIMEOUT)
 
         self.network = Network()
@@ -104,8 +103,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         ]
         PacketUtils.add_flow(datapath, FlowPriority.TABLE_MISS.value, match, actions)
 
-        # dscp_value = 32  # TODO: set as a constant
-        match = parser.OFPMatch(eth_type=0x0800, ip_dscp=32 >> 2)  # IPv4 with DSCP 32
+        match = parser.OFPMatch(eth_type=0x0800, ip_dscp=DSCP_TAG_VALUE >> 2)  # IPv4 with DSCP 32
         actions = [
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
         ]
@@ -126,13 +124,13 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         eth = pkt.get_protocol(ethernet.ethernet)
 
         is_monitored_packet = False
-        # TODO: skip add flows when registering packets for monitoring
         ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
         if ipv4_pkt:
             dscp_value = (ipv4_pkt.tos)  # Extract DSCP from TOS field
             logging.info("Received IPv4 packet with DSCP value %d", dscp_value)
 
             is_monitored_packet = dscp_value == 32  # Filter DSCP-tagged packets
+            # later, when registering packets for monitoring `add_flow` is not called
 
         if eth.ethertype != ether_types.ETH_TYPE_IP: # type: ignore
             return
@@ -142,14 +140,6 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         dpid = datapath.id
 
         logging.info(f"---------------------- {self.network.link_to_slice_dict}")
-
-        # TODO:
-        # 1. Check if slice.active is correctly implemented
-        # 2. Implement slicing for also host connections
-        # X. Check packet dropping if no slice correct (maybe correct)
-        # X. Avoid host connection in outgoing connections if host different from dst
-        # 5. When returning an udp packet (assigned to a port), the match should check src_port instead of dst_port (or leave it as is and implemente allowed_services)
-        # 6. Check default queue parameters and redirecting
 
         logging.info("Packet in dpid: %s src: %s dst: %s in_port: %s", dpid, src, dst, in_port)
 
@@ -184,10 +174,10 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                     datapath.ofproto_parser.OFPActionOutput(out_port)
                 ]
                 match = datapath.ofproto_parser.OFPMatch(**match_conditions)
-                PacketUtils.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
+                if not is_monitored_packet:
+                    PacketUtils.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
                 PacketUtils.send_package(msg, datapath, in_port, actions)
                 logging.info(f"Packet sent to slice {Slice.get_slice_id(slice)} from port {in_port} to port {out_port} to queue {queue_id}")
-                # TODO: isn't it more correct to add a flow for each slice?
                 return
 
         logging.info("Packet not yet mapped to any slice")
@@ -229,14 +219,16 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                         logging.info("Packet is monitored and is a host connection, adding additional registered step")
                         host_node = Network.get_instance().nodes[Node.get_host_id(connection.host_mac)]
                         self.monitoring_manager.add_recording_step(host_node, pkt)
-            PacketUtils.add_flow(datapath, priority, match, actions)
+            if not is_monitored_packet:
+                PacketUtils.add_flow(datapath, priority, match, actions)
             
             # flood the packet to all specified connections (after adding flows) 
             PacketUtils.send_package(msg, datapath, in_port, actions)
         else:
             logging.info("No outgoing connections found for the packet, DROPPING it")
             drop_match = datapath.ofproto_parser.OFPMatch(**self._get_match_conditions_for_packet(pkt, in_port, slices))
-            PacketUtils.add_flow(datapath, FlowPriority.DROP.value, drop_match, [])
+            if not is_monitored_packet:
+                PacketUtils.add_flow(datapath, FlowPriority.DROP.value, drop_match, [])
 
     def _get_port_for_mac_and_slice(self, switch_id: str, slice_name: str, mac: str) -> Optional[Tuple[int, int]]:
         switch_slices = self.mac_to_port.get(switch_id, None)
@@ -260,7 +252,6 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         l3_packet = SliceUtils.get_l3_packet(pkt)
         pkt_protocol = Protocol.from_id(l3_packet.proto) if l3_packet else None  # type: ignore
         l4_packet = SliceUtils.get_l4_packet(pkt, pkt_protocol)
-        # TODO: check if l4_packet is None and handle it
         
         conditions = {
             "eth_dst": eth_header.dst if not invert_src_dst else eth_header.src, # type: ignore
