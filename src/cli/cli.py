@@ -23,7 +23,7 @@ class CustomCLI(CLI):
         """Executed before entering the CLI loop."""
         if self.first_cmd:
             self.first_cmd = False
-            self.wait_for_nodes()
+            #self.wait_for_nodes()
 
             # Start thread polling apis for packets requests
             self.polling_thread = threading.Thread(target=poll_apis_for_packets, args=({"mn": self.mn, "cli": self},))
@@ -119,7 +119,7 @@ def make_host_send_packet(mn: Mininet, cli: CustomCLI, packet_info: Dict) -> Dic
 
     # run python script inside node h1
     h1 = mn.get("h1")
-    h1.sendCmd(f"python3 commands/send_packet.py -ip 10.0.0.3 -t {protocol} -p 9999")
+    h1.sendCmd(f"python3 cli/send_packet.py -ip 10.0.0.3 -t {protocol} -p 9999")
     # TODO: override output to avoid printing in the console
     cli.waitForNode(h1)
 
