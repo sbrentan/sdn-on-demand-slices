@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional
+from typing import Optional, List
 
 from common import Network, Connection, Slice, NodeType
 from utils import QueueUtils, PacketUtils, SliceUtils
@@ -46,11 +46,21 @@ class SlicesManager:
         self.network.slices.remove(slice)
         self.init_slices()
 
-    def update_slice(self, slice: Optional[Slice] = None):
-        self._reset_switches_for_slice(slice)
+    def update_slice(self, slice: Optional[Slice] = None, switches_to_skip: List[str] = None) -> List[str]:
+        """
+        Update the slice and reset the switches for the slice.
+        Skip the switches that are in the switches_to_skip list.
+        :param slice: Slice to update
+        :param switches_to_skip: List of switches to skip
+        :return: List of affected switches
+        """
+        affected_switches = self._reset_switches_for_slice(slice, switches_to_skip=switches_to_skip)
         self.init_slices()
+        return affected_switches
 
-    def _reset_switches_for_slice(self, slice: Optional[Slice] = None):
+    def _reset_switches_for_slice(self, slice: Optional[Slice] = None, switches_to_skip: List[str] = None) -> List[str]:
+        if not switches_to_skip:
+            switches_to_skip = []
         link_to_slice_dict = SliceUtils.get_link_to_slice_dict(skip_active_slices=False)
         affected_switches = {}
         for connection in self.network.connections:
@@ -60,7 +70,11 @@ class SlicesManager:
                     affected_switches[connection.src[1].node_id] = connection.src[1].node_ref
                 if connection.dst[1].node_type == NodeType.SWITCH:
                     affected_switches[connection.dst[1].node_id] = connection.dst[1].node_ref
+        # remove switches that are in the switches_to_skip list
+        if switches_to_skip:
+            affected_switches = {k: v for k, v in affected_switches.items() if k not in switches_to_skip}
         logging.info(f"Affected switches: {affected_switches}")
         for switch in affected_switches.values():
             QueueUtils.delete_queues(switch.dp.id)
             PacketUtils.delete_flows(switch)
+        return affected_switches.keys()

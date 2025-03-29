@@ -6,7 +6,6 @@ async function send_packet(packet_info){
     packet_result = null
     while(true){
         result = await fetchData(`${ApiPaths.PACKET_RESULT.replace("{packet_id}", packet_id)}`, 'GET')
-        console.log(result)
         if(result['status'] == 'completed'){
             packet_result = result
             break
@@ -52,7 +51,8 @@ function openSendPacketModal(callback) {
     }));
 
     // Load data in host source and destination from graph_data
-    graph_data.nodes.forEach(element => {
+    ordered_data_nodes = graph_data.nodes.sort((a, b) => a.name.localeCompare(b.name))
+    ordered_data_nodes.forEach(element => {
         if (element.type === 'Host') {
             $('#packet-source_select').append($('<option>', {
                 value: element.id,
@@ -76,12 +76,26 @@ function openSendPacketModal(callback) {
 		}
 		var protocol = $('#packet-protocol_select').val();
 
-		var port = $('#packet-port_input').val();
-        if (port === '' || isNaN(port) || port < 1 || port > 65535) {
-            alert('Please enter a valid port number between 1 and 65535.');
-            return;
+        var dst_port = 0;
+        if (protocol === 'TCP' || protocol === 'UDP') {
+            dst_port = $('#packet-dst_port_input').val();
+            if (dst_port === '' || isNaN(dst_port) || dst_port < 1 || dst_port > 65535) {
+                alert('Please enter a valid source port number between 1 and 65535.');
+                return;
+            }
+            dst_port = $('#packet-dst_port_input').val();
         }
-		var port = $('#packet-port_input').val();
+
+		var src_port = $('#packet-src_port_input').val();
+        if (src_port === '') {
+            src_port = null;
+        } else {
+            if (isNaN(src_port) || src_port < 1 || src_port > 65535) {
+                alert('Please enter a valid source port number between 1 and 65535.');
+                return;
+            }
+            src_port = $('#packet-src_port_input').val();
+        }
 
         var source = $('#packet-source_select').val();
         if (source === '' || source === null || source === undefined) {
@@ -98,9 +112,12 @@ function openSendPacketModal(callback) {
         packet_info = {
             "source": source,
             "dest": dest,
-            "protocol": protocol,
-            "port": port
+            "protocol": protocol
         }
+        if (src_port != null)
+            packet_info['src_port'] = src_port
+        if (dst_port != null)
+            packet_info['dst_port'] = dst_port
 
         console.log(packet_info)
 		

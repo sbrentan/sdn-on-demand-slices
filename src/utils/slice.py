@@ -120,9 +120,11 @@ class SliceUtils:
                 return False
             src_port = l4_packet.src_port  # type: ignore
             dst_port = l4_packet.dst_port  # type: ignore
+            logging.info(f"[is_services_valid] Checking {src} - {src_port} - " + str(slice.rules["allowed_services"]))
             if src in slice.rules["allowed_services"]:
                 if src_port in slice.rules["allowed_services"][src]:
                     services_valid = True
+            logging.info(f"[is_services_valid] Checking {dst} - {dst_port} - " + str(slice.rules["allowed_services"]))
             if dst in slice.rules["allowed_services"]:
                 if dst_port in slice.rules["allowed_services"][dst]:
                     services_valid = True

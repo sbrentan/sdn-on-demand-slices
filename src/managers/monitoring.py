@@ -1,8 +1,9 @@
 import logging
 from typing import Dict, List, Tuple, Optional
 
-from common import Node, NodeType
+from common import Node, NodeType, PacketInfo
 from ryu.lib.packet.packet import Packet
+
 
 class MonitoringManager:
 
@@ -21,12 +22,12 @@ class MonitoringManager:
     def active_packet(self) -> bool:
         return self.packets_last_id in self.packets
     
-    def send_packet(self, packet_info: Dict) -> int:
+    def send_packet(self, packet_info: PacketInfo) -> int:
         self.packets_last_id += 1
         self.packets[self.packets_last_id] = packet_info
         return self.packets_last_id
     
-    def get_packet(self, packet_id: Optional[int] = None) -> Dict:
+    def get_packet(self, packet_id: Optional[int] = None) -> PacketInfo:
         if not packet_id:
             packet_id = list(self.packets.keys())[0]
         if packet_id not in self.packets:

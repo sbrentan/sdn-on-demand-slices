@@ -145,20 +145,21 @@
     });
     {% else %}
     makeEditable("#slice-details", onconfirm = async function(data) {
+        // This is called only when updating a slice
+        {% if not new_slice %}
+        document.getElementById('request-indicator').classList.add('show');
         data['rules'] = getDefinedSliceRules();
         if (!data['rules'])
             return false;
         try {
-            // TODO: check implementation
-            {% if new_slice %}
-            await fetchData("", "POST", JSON.stringify(data), "{{ Paths.SLICES() }}");
-            {% else %}
             await fetchData("", "PUT", JSON.stringify(data), "{{ Paths.SLICE(slice.id) }}");
-            {% endif %}
+            document.getElementById('request-indicator').classList.remove('show');
             return true;
         } catch (error) {
+            document.getElementById('request-indicator').classList.remove('show');
             console.error("Failed to update slice details", error);
         }
+        {% endif %}
         return false;
     }, oncancel = restoreInitialSliceRules);
     {% endif %}

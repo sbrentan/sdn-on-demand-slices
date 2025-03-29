@@ -12,17 +12,20 @@
 					<!-- Protocol input -->
 					<select class="form-control" id="packet-protocol_select" required>
                         <option selected disabled>--- Select a protocol ---</option>
+						<option value="ICMP">ICMP</option>
                         <option value="UDP">UDP</option>
                         <option value="TCP">TCP</option>
                     </select><br>
 					<!-- Host source input -->
-					<select class="form-control" id="packet-source_select" required placeholder="Select source node">
+					<select class="form-control" id="packet-source_select" required>
 					</select><br>
 					<!-- Host destination input -->
 					<select class="form-control" id="packet-dest_select" required>
 					</select><br>
 					<!-- Port input -->
-					<input type="number" step="1" id="packet-port_input" class="form-control port-input" placeholder="Enter port">
+					<input type="number" step="1" id="packet-dst_port_input" class="form-control port-input" placeholder="Destination port" style="display: none;">
+					<!-- Port input -->
+					<input type="number" step="1" id="packet-src_port_input" class="form-control port-input" placeholder="Source port(optional)" style="display: none;">
 				</form>
 			</div>
 			<div class="modal-footer">
@@ -32,3 +35,18 @@
 		</div>
 	</div>
 </div>
+
+<script>
+	document.getElementById("packet-protocol_select").addEventListener("change", function() {
+		const protocol = this.value;
+		const portInput = document.getElementById("packet-dst_port_input");
+		const srcPortInput = document.getElementById("packet-src_port_input");
+		if (protocol === "ICMP") {
+			portInput.style.display = "none";
+			srcPortInput.style.display = "none";
+		} else {
+			portInput.style.display = "block";
+			srcPortInput.style.display = "block";
+		}
+	});
+</script>

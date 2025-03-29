@@ -72,9 +72,9 @@ class APIController(ControllerBase):
         if new_slice.id in self.network.slices:
             logging.error(f"Error creating slice {slice_data['name']}: ID already exists")
             return self._json_response(status="409 Conflict")
-        self.network.slices.append(Slice.from_dict(slice_data))
+        self.network.slices.append(new_slice)
 
-        # TODO: reset queues of affected switches
+        self.slices_manager.update_slice(new_slice)
 
         return self._json_response(status="201 Created", data=new_slice.to_dict())
     
@@ -88,8 +88,6 @@ class APIController(ControllerBase):
     def update_slice(self, req, slice_id, **kwargs):
         """REST endpoint to update a slice."""
 
-        # TODO: reset queues if bandwidth/rules are updated
-
         try:
             slice_data = json.loads(req.body)
         except Exception as e:
@@ -99,7 +97,12 @@ class APIController(ControllerBase):
         if not slice_match:
             logging.error(f"Error updating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
+        
+        # Calling two times `update_slice` to be sure to update and reset all queues of both previous and current affected switches
+        affected_switches = self.slices_manager.update_slice(slice_match[0])
         slice_match[0].update_from_dict(slice_data)
+        self.slices_manager.update_slice(slice_match[0], switches_to_skip=affected_switches)
+
         logging.info(f"Updating slice {slice_id} with data: {slice_data}")
         logging.info(f"Updated slice: " + json.dumps(slice_match[0].to_dict(), indent=4))
         return self._json_response(status="200 OK", data=slice_match[0].to_dict())
@@ -253,8 +256,20 @@ class APIController(ControllerBase):
         except Exception as e:
             logging.error(f"Error sending packet: {e}")
             return self._json_response(status="400 Bad Request")
-        packet_id = self.monitoring_manager.send_packet(packet_data)
-        logging.info(f"Sending packet: {packet_data} with id {packet_id}")
+        network = Network.get_instance()
+        src_port = packet_data.get("src_port", None)
+        if src_port:
+            src_port = int(src_port)
+        dst_port = int(packet_data.get("dst_port"))
+        packet_info = {
+            "protocol": packet_data.get("protocol"),
+            "dst_port": dst_port,
+            "src_port": src_port,
+            "src_mac": network.hosts[packet_data.get("source")].mac,
+            "dst_mac": network.hosts[packet_data.get("dest")].mac,
+        }
+        packet_id = self.monitoring_manager.send_packet(packet_info)
+        logging.info(f"Sending packet: {packet_info} with id {packet_id}")
         return self._json_response(status="201 Created", data={"packet_id": packet_id})
     
     @route('get_packet', ApiPaths.PACKET(), methods=['GET'])

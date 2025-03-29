@@ -485,16 +485,20 @@ async function finalizeNewSlice() {
 
     console.log("New slice:", newSlice);
 
+    document.getElementById('request-indicator').classList.add('show');
     await fetchData(`${GuiPaths.SLICES}`, 'POST', newSlice);
+    document.getElementById('request-indicator').classList.remove('show');
     
     // Reset new slice mode and remove temporary event listeners on nodes and links
     isCreatingNewSlice = false;
     newSliceNodes = [];
     d3.selectAll("image").on("click.newSlice", null);
     d3.selectAll("line").on("click.newSlice", null);
+
+    window.location.reload();
 }
 
-// (Optional) Update your slice list UI based on the slices array.
+// Update slice list UI based on the slices array.
 function updateSliceListUI() {
     const sliceList = document.getElementById("slice-list");
     sliceList.innerHTML = "";

@@ -143,7 +143,7 @@ class GUIController(ControllerBase):
         status, response = self.get_data(ApiPaths.SLICE(slice_id), method="PUT", data=req.json)
         if status != 200:
             return Response(status=status, body=f"Error while trying to update slice data: {response}")
-        if not response:
+        if response:
             response = json.dumps(response)
 
         return Response(status=status, body=response)
