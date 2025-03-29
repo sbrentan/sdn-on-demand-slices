@@ -7,10 +7,6 @@ from ryu.topology import event
 from utils import QueueUtils
 
 
-# TODO ???: update with initialization request on slice adding (or when loading from file)
-#           -> Probably refresh slices when adding a slice
-
-
 class TopologyEventHandler(abc.ABC):
 
     @set_ev_cls(event.EventHostAdd)

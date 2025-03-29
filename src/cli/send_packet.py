@@ -4,11 +4,8 @@ import subprocess
 import re
 import struct
 import os
-import time
 
 DSCP_TAG_VALUE = 32
-
-# TODO: manage ICMP packet
 
 def get_host_ip_from_ifconfig():
     """Get the IP address of the host using the ifconfig command."""

@@ -123,9 +123,9 @@ class Slice:
             data = json.loads(data)
         self.name = data["name"] if "name" in data else self.name
         self.rules = data["rules"] if "rules" in data else self.rules
-        # TODO: implement hosts and switcheds update from data
-        # self.switches = data["switches"] if "nodes" in data else self.switches # TODO: change
-        # self.hosts = data['hosts'] if "nodes" in data else self.hosts # TODO: change
+        # TODO: implement hosts and switches update from data??
+        # self.switches = data["switches"] if "nodes" in data else self.switches
+        # self.hosts = data['hosts'] if "nodes" in data else self.hosts
         self.active = bool(data["active"]) if "active" in data else self.active
         self.min_rate = data["min_rate"] if "min_rate" in data else self.min_rate
         self.max_rate = data["max_rate"] if "max_rate" in data else self.max_rate
