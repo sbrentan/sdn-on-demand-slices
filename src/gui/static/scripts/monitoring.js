@@ -50,6 +50,10 @@ function openSendPacketModal(callback) {
         selected: true
     }));
 
+    // Reset port visibility
+    document.getElementById("packet-dst_port_input").style.display = "none";
+    document.getElementById("packet-src_port_input").style.display = "none";
+
     // Load data in host source and destination from graph_data
     ordered_data_nodes = graph_data.nodes.sort((a, b) => a.name.localeCompare(b.name))
     ordered_data_nodes.forEach(element => {

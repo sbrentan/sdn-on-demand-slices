@@ -162,6 +162,15 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         # for each slice, set the mac to port for the incoming port
         slices = SliceUtils.get_slices_from_packet(switch_id, pkt, in_connection)
 
+        # Set port for mac and slice for sender in each slice
+        for slice in slices:
+            slice_name = Slice.get_slice_id(slice)
+            result = self._get_port_for_mac_and_slice(switch_id, Slice.get_slice_id(slice), src)
+            if not result:
+                queue = in_connection.get_queue_for_slice(slice)
+                self._set_port_for_mac_and_slice(switch_id, slice_name, src, in_port, queue)
+                logging.info(f"Updated routing for sender: {src} -> {in_port} (queue {queue}) in slice {slice_name}")
+
         # check if the packet belongs to a slice and send it to the corresponding port
         for slice in slices:
             result = self._get_port_for_mac_and_slice(switch_id, Slice.get_slice_id(slice), dst)

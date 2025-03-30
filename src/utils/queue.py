@@ -25,8 +25,8 @@ class QueueUtils:
         If the packet belongs to a slice:
         - If some outgoing connections are found for the slice, return those
         - For all the other cases, return empty Dict (meaning the packet should be dropped)
-        If the packet does not belong to a slice:
-        - Return all the outgoing connections which are not part of any slice
+        If the packet does not belong to a slice: (removed)
+        - Return all the outgoing connections which are not part of any slice (removed)
 
         Args:
             switch_id (str): ID of the switch where the packet came from (e.g. s1)
