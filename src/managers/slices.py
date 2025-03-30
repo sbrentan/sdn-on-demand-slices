@@ -33,18 +33,21 @@ class SlicesManager:
 
     def enable_slice(self, slice: Slice):
         slice.active = True
-        self._reset_switches_for_slice(slice)
+        affected_switches = self._reset_switches_for_slice(slice)
         self.init_slices()
+        QueueUtils.init_queues(affected_switches)
 
     def disable_slice(self, slice: Slice):
         slice.active = False
-        self._reset_switches_for_slice(slice)
+        affected_switches = self._reset_switches_for_slice(slice)
         self.init_slices()
+        QueueUtils.init_queues(affected_switches)
 
     def delete_slice(self, slice: Slice):
-        self._reset_switches_for_slice(slice)
+        affected_switches = self._reset_switches_for_slice(slice)
         self.network.slices.remove(slice)
         self.init_slices()
+        QueueUtils.init_queues(affected_switches)
 
     def update_slice(self, slice: Optional[Slice] = None, switches_to_skip: List[str] = None) -> List[str]:
         """
@@ -56,6 +59,7 @@ class SlicesManager:
         """
         affected_switches = self._reset_switches_for_slice(slice, switches_to_skip=switches_to_skip)
         self.init_slices()
+        QueueUtils.init_queues(affected_switches)
         return affected_switches
 
     def _reset_switches_for_slice(self, slice: Optional[Slice] = None, switches_to_skip: List[str] = None) -> List[str]:

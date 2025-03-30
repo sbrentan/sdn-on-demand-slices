@@ -25,8 +25,6 @@ class QueueUtils:
         If the packet belongs to a slice:
         - If some outgoing connections are found for the slice, return those
         - For all the other cases, return empty Dict (meaning the packet should be dropped)
-        If the packet does not belong to a slice: (removed)
-        - Return all the outgoing connections which are not part of any slice (removed)
 
         Args:
             switch_id (str): ID of the switch where the packet came from (e.g. s1)
@@ -69,45 +67,31 @@ class QueueUtils:
                 logging.info(f"[get_links_for_slices] Host connection found: {link_id}")
                 return {link_id: outgoing_queues[link_id]}
                 
-            # if not slices and not network.link_to_slice_dict[link_id]:
-            #     # If the packet does not belong to any slice and the connection does not have any slice
-            #     #     flood the packet to this connection in FLOODING mode in default queue
-            #     logging.info(f"[get_links_for_slices] No slice found for link: {link_id}, setting queue_id to 0")
-            #     try:
-            #         outgoing_queues[link_id] = connection.get_queue_for_slice(None)
-            #     except ValueError:
-            #         logging.info(f"[get_links_for_slices] [ValueError] Default queue not found for link: {link_id}")
-            #         continue
-                
         return outgoing_queues
 
     @staticmethod
-    def init_queues():
+    def init_queues(switch_ids: List[str] = None):
 
         # TODO: edit queues based on previous existing queues (is a new switch is added, edit only the connected switches queues)
+
+        # At the moment this function only creates queues for the switches
+        #    if you need to delete also the queues, you need to call delete_queues first
         
         network = Network.get_instance()
         if network is None:
             logging.info("[init_queues] Network is not defined")
             return
-        for connection in network.connections:
-            src_dpid = connection.src[0].dpid
-            dst_dpid = connection.dst[0].dpid
-            src_port = connection.src[0].name
-            dst_port = connection.dst[0].name
 
-            # TODO: change the delete_queue logic: unique url DELETE /qos/queue/all to delete all QoS queues
-            # TODO: change the delete_rules logic: unique url DELETE /qos/rules/all/all to delete all QoS rules ??
+        logging.info("[init_queues] Initializing queues for switches " + str(switch_ids))
+        logging.info("[init_queues] Network switches: " + str(network.switches))
+        if switch_ids:
+            switches = {sid: switch for sid, switch in network.switches.items() if Node.get_switch_id(switch.dp.id) in switch_ids}
+        else:
+            switches = network.switches
 
-            connection_id = Connection.get_link_id(connection)
-            # if connection_id in network.link_to_slice_dict and len(network.link_to_slice_dict[connection_id]) > 1:
-                # TODO: manage the case when a previous active slice is removed and the queues should be deleted anyway
-            # status, result = QueueUtils.delete_queues(src_dpid, src_port)
-            # logging.info(f"QueueUtils.delete_queues for connection ({connection}) src {src_dpid} {src_port}: {status} {result}")
-            # status, result = QueueUtils.delete_queues(dst_dpid, dst_port)
-            # logging.info(f"QueueUtils.delete_queues for connection ({connection}) dst {dst_dpid} {dst_port}: {status} {result}")
+        logging.info("[init_queues] Found switches: " + str(switches))
 
-        for _, switch in network.switches.items():
+        for _, switch in switches.items():
             node_id = Node.get_node_id(switch)
             switch_connections = network.node_connections.get(node_id, [])
             for connection in switch_connections:
@@ -126,13 +110,6 @@ class QueueUtils:
                             max_rate=slice.max_rate,
                             slice=slice
                         ))
-
-                # if queues:
-                #     logging.info(f"Setting default queue for switch {switch.dp.id} port {port_name}")
-                #     queues = [Queue.get_default_queue(switch, connection)] + queues
-                # else:
-                #     logging.info(f"Adding default queue for switch {switch.dp.id} port {port_name}")
-                #     queues.append(Queue.get_default_queue(switch, connection, min_rate=DEFAULT_QUEUE_MIN_RATE, max_rate=DEFAULT_QUEUE_MAX_RATE))
 
                 logging.info(f"Creating queues for switch {switch.dp.id} on port {port_name}")
                 status, result = QueueUtils.create_queues(switch.dp.id, port_name, queues)

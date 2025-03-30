@@ -107,7 +107,7 @@ class SliceUtils:
     @staticmethod
     def is_services_valid(slice: Slice, pkt: Packet) -> bool:
         services_valid = True
-        if slice.rules["allowed_services"] is not None:
+        if slice.rules["allowed_services"]:
             services_valid = False
             ip_header = pkt.get_protocol(ipv4.ipv4)
             if ip_header is None:
@@ -143,14 +143,17 @@ class SliceUtils:
             if skip_active_slices and not slice.active:
                 continue
             for connection in network.connections:
+                slice_to_add = None
                 connection_id = Connection.get_link_id(connection)
                 if connection.is_host_connection:
                     if connection.src[1].ref_id in slice.hosts:
                         if slice.id not in [s.id for s in link_to_slice_dict[connection_id]]:
-                            link_to_slice_dict[connection_id].append(slice)
+                            slice_to_add = slice
                 elif connection.src[1].ref_id in slice.switches and connection.dst[1].ref_id in slice.switches:
                     if slice.id not in [s.id for s in link_to_slice_dict[connection_id]]:
-                        link_to_slice_dict[connection_id].append(slice)
+                        slice_to_add = slice
+                if slice_to_add and connection_id not in slice.skipped_links:
+                    link_to_slice_dict[connection_id].append(slice_to_add)
         return link_to_slice_dict
 
     @staticmethod

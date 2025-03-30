@@ -124,7 +124,8 @@ class CustomCLI(CLI):
         )
         steps = make_host_send_packet(self.mn, self, packet_info)
         
-        output("\n***\n"+" -> ".join([step.get("name") for step in steps])+ "\n***\n")
+        # output("\n***\n"+" -> ".join([step.get("name") for step in steps])+ "\n***\n")
+        print_packet_trace(steps)
 
 
     def default(self, line):
@@ -186,3 +187,34 @@ def poll_apis_for_packets(args: Dict):
                 # Save the packet result
                 requests.post(f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{ApiPaths.PACKET_RESULT(packet_id)}", json=packet_result)
     print("Stopping polling thread...")
+
+
+def print_packet_trace(node, prefix="", is_last=True):
+    """
+    Recursively prints the packet flow in a structured way.
+    
+    :param node: A dict with an 'id' and an optional list of 'children'.
+    :param prefix: String used for indentation.
+    :param is_last: Boolean flag indicating if this node is the last among siblings.
+    """
+    # Choose a branch symbol: if this is the root, no symbol is needed.
+    branch = ""
+    if prefix:
+        branch = "└─" if is_last else "├─"
+    
+    # Print current node with branch symbol.
+    print(f"{prefix}{branch} → {node['id']}")
+    
+    # If there are no children, mark the end of this branch.
+    children = node.get("children", [])
+    if not children:
+        print(f"{prefix}{'   ' if is_last else '│  '} 🔴 Packet ends at {node['id']}")
+        return
+
+    # Prepare a new prefix for children.
+    new_prefix = prefix + ("   " if is_last else "│  ")
+    
+    # Recursively print each child.
+    for index, child in enumerate(children):
+        is_last_child = (index == len(children) - 1)
+        print_packet_trace(child, new_prefix, is_last_child)

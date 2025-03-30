@@ -18,6 +18,7 @@ var outlineFilter = undefined;
 let isCreatingNewSlice = false;
 let newSliceNodes = []; // stores selected node IDs
 let newSliceIdCounter = 0;
+let skipped_links = [];
 
 /* ----------------------- Onload helper ----------------------- */
 
@@ -134,8 +135,9 @@ function highlightSlice(component, slice) {
     outlineFilter.select("feFlood").attr("flood-color", OUTLINE_COLOR);
     node.attr("filter", d => slice.nodes.includes(d.id) ? "url(#outlineFilter)" : null);
 
-    // line stroke 4 if link is in slice, else 2
-    link.attr("stroke", d => slice.links.includes(d.id) ? OUTLINE_COLOR : LINK_COLOR).attr("stroke-width", d => slice.links.includes(d.id) ? 4 : 2);
+    // Ensure skipped links are not highlighted
+    link.attr("stroke", d => (slice.links.includes(d.id) && !slice.skipped_links?.includes(d.id)) ? OUTLINE_COLOR : LINK_COLOR)
+        .attr("stroke-width", d => (slice.links.includes(d.id) && !slice.skipped_links?.includes(d.id)) ? 4 : 2);
 }
 
 function deselectAll() {
@@ -321,61 +323,96 @@ function renderGraph(data, slices) {
 }
 
 /**
- * Animate a packet along a series of nodes using an image.
- * @param {Array} steps - An array of node IDs representing the path, e.g. ['h1', 's1', 's2', 'h2'].
- * @param {Number} duration - Duration (in ms) for each transition between nodes.
+ * Animate a packet along a branching path using an image.
+ * @param {Object} treeNode - The root of the packet tree { id: string, children: [] }.
+ * @param {Number} duration - Duration (ms) for each transition between nodes.
  */
-function animatePacketPath(steps, duration = 800) {
+function animatePacketPath(treeNode, duration = 800) {
     const svg = d3.select("#network-graph");
-
     const PACKET_SIZE = 40;
-
-    // Create a packet image element
-    const packet = svg.append("image")
-        .attr("href", `${STATIC_FOLDER}/images/packet.png`)
-        .attr("width", PACKET_SIZE)
-        .attr("height", PACKET_SIZE)
-        .attr("opacity", 1);
 
     // Helper: get node data by id
     function getNodeById(id) {
         return graph_data.nodes.find(node => node.id === id);
     }
 
-    // Start at the first node in the path
-    let startNode = getNodeById(steps[0]);
+    // Get starting node position
+    let startNode = getNodeById(treeNode.id);
     if (!startNode) {
-        console.error("Starting node not found:", steps[0]);
+        console.error("Starting node not found:", treeNode.id);
         return;
     }
-    packet.attr("x", startNode.x - PACKET_SIZE / 2)
-          .attr("y", startNode.y - PACKET_SIZE / 2);
 
-    // Recursive function to animate packet through steps
-    function moveToStep(index) {
-        if (index >= steps.length) {
-            packet.transition().duration(500).style("opacity", 0).remove();
+    // Create a packet image element at the starting node's position
+    const packet = svg.append("image")
+        .attr("href", `${STATIC_FOLDER}/images/packet.png`)
+        .attr("width", PACKET_SIZE)
+        .attr("height", PACKET_SIZE)
+        .attr("x", startNode.x - PACKET_SIZE / 2)
+        .attr("y", startNode.y - PACKET_SIZE / 2)
+        .attr("opacity", 1);
+
+    /**
+     * Recursively animate the packet from the current node to its children.
+     * - If there's one child, reuse the same packet.
+     * - If multiple children exist, clone the packet for each branch.
+     * - Fade and remove the packet when there are no children.
+     * @param {Object} currentPacket - The current packet element.
+     * @param {Object} node - The current node in the packet tree.
+     */
+    function moveToChildren(currentPacket, node) {
+        // If no further branch, fade out and remove the packet.
+        if (!node.children || node.children.length === 0) {
+            currentPacket.transition()
+                .duration(500)
+                .style("opacity", 0)
+                .remove();
             return;
         }
-        let nextNode = getNodeById(steps[index]);
-        if (!nextNode) {
-            console.error("Node not found for step:", steps[index]);
-            return;
+
+        // If there's exactly one child, animate the current packet.
+        if (node.children.length === 1) {
+            const child = node.children[0];
+            const nextNode = getNodeById(child.id);
+            if (!nextNode) {
+                console.error("Node not found for step:", child.id);
+                return;
+            }
+            currentPacket.transition()
+                .duration(duration)
+                .attr("x", nextNode.x - PACKET_SIZE / 2)
+                .attr("y", nextNode.y - PACKET_SIZE / 2)
+                .on("end", () => moveToChildren(currentPacket, child));
+        } else {
+            // If there are multiple children, clone the packet for each branch.
+            const parentPos = getNodeById(node.id);
+            node.children.forEach(child => {
+                const nextNode = getNodeById(child.id);
+                if (!nextNode) {
+                    console.error("Node not found for step:", child.id);
+                    return;
+                }
+                const newPacket = currentPacket.clone(true)
+                    .attr("x", parentPos.x - PACKET_SIZE / 2)
+                    .attr("y", parentPos.y - PACKET_SIZE / 2);
+                newPacket.transition()
+                    .duration(duration)
+                    .attr("x", nextNode.x - PACKET_SIZE / 2)
+                    .attr("y", nextNode.y - PACKET_SIZE / 2)
+                    .on("end", () => moveToChildren(newPacket, child));
+            });
+            // Remove the current packet since its branches are now handled.
+            currentPacket.remove();
         }
-        packet.transition()
-            .duration(duration)
-            .attr("x", nextNode.x - PACKET_SIZE / 2)
-            .attr("y", nextNode.y - PACKET_SIZE / 2)
-            .on("end", () => moveToStep(index + 1));
     }
 
-    // Begin the animation from the second step (index 1)
-    moveToStep(1);
+    // Start the animation from the root node.
+    moveToChildren(packet, treeNode);
 }
 
 
-
 /* ----------------------- New Slice Management ----------------------- */
+
 
 // Start new slice creation mode
 async function startNewSlice() {
@@ -383,6 +420,7 @@ async function startNewSlice() {
     isCreatingNewSlice = true;
     
     newSliceNodes = [];
+    skipped_links = []; // Initialize the skipped links array
     deselectAll(); // Deselect any previous selection (and hide lateral menu)
     document.querySelector(".graph-info").innerText = "Select the nodes in the network to include in the new slice:";
     document.querySelector(".graph-info").classList.add("show");
@@ -412,6 +450,29 @@ async function startNewSlice() {
       .on("click.newSlice", function(event, d) {
          event.stopPropagation();
          event.stopImmediatePropagation();
+         // Only process click if both connected nodes are selected
+         const sourceId = (typeof d.source === "object") ? d.source.id : d.source;
+         const targetId = (typeof d.target === "object") ? d.target.id : d.target;
+         if (newSliceNodes.includes(sourceId) && newSliceNodes.includes(targetId)) {
+             const linkId = d.id;
+             // Toggle deselection/reselection for the link
+             if (skipped_links.includes(linkId)) {
+                 // Reselect: remove from skipped_links
+                 skipped_links = skipped_links.filter(id => id !== linkId);
+             } else {
+                 // Deselect: add to skipped_links
+                 skipped_links.push(linkId);
+             }
+             // Recompute the links connecting the currently selected nodes, ignoring skipped links
+             const computedLinks = graph_data.links.filter(link => {
+                const sId = (typeof link.source === "object") ? link.source.id : link.source;
+                const tId = (typeof link.target === "object") ? link.target.id : link.target;
+                return newSliceNodes.includes(sId) && newSliceNodes.includes(tId) && !skipped_links.includes(link.id);
+             }).map(link => link.id);
+             // Use your existing highlightSlice to highlight the selected nodes and their interconnecting links
+             const tempSlice = { nodes: newSliceNodes, links: computedLinks };
+             highlightSlice(null, tempSlice);
+         }
       });
 }
 
@@ -428,7 +489,7 @@ function toggleNodeSelectionForNewSlice(nodeSelection, nodeData) {
     const computedLinks = graph_data.links.filter(link => {
         const sourceId = (typeof link.source === "object") ? link.source.id : link.source;
         const targetId = (typeof link.target === "object") ? link.target.id : link.target;
-        return newSliceNodes.includes(sourceId) && newSliceNodes.includes(targetId);
+        return newSliceNodes.includes(sourceId) && newSliceNodes.includes(targetId) && !skipped_links.includes(link.id);
     }).map(link => link.id);
     
     // Use your existing highlightSlice to highlight the selected nodes and their interconnecting links
@@ -465,6 +526,7 @@ async function finalizeNewSlice() {
     const newSlice = {
         hosts: hosts,
         switches: switches,
+        skipped_links: skipped_links
     };
 
     // Fetch slice form data
@@ -486,15 +548,25 @@ async function finalizeNewSlice() {
     console.log("New slice:", newSlice);
 
     document.getElementById('request-indicator').classList.add('show');
-    await fetchData(`${GuiPaths.SLICES}`, 'POST', newSlice);
+    error = false;
+    try{
+        await fetchData(`${GuiPaths.SLICES}`, 'POST', newSlice);
+    } catch (error) {
+        error = true;
+        console.error("Error creating new slice:", error);
+        alert("An error occurred while creating the new slice. Please try again.");
+    }
     document.getElementById('request-indicator').classList.remove('show');
     
     // Reset new slice mode and remove temporary event listeners on nodes and links
     isCreatingNewSlice = false;
     newSliceNodes = [];
+    skipped_links = [];
     d3.selectAll("image").on("click.newSlice", null);
     d3.selectAll("line").on("click.newSlice", null);
 
+    if (error)
+        return;
     window.location.reload();
 }
 
@@ -522,6 +594,7 @@ function cancelNewSlice() {
     // Reset new slice mode and remove temporary event listeners on nodes and links
     isCreatingNewSlice = false;
     newSliceNodes = [];
+    skipped_links = [];
     d3.selectAll("image").on("click.newSlice", null);
     d3.selectAll("line").on("click.newSlice", null);
 
@@ -538,6 +611,7 @@ function cancelNewSlice() {
 
     document.querySelector(".graph-info").classList.remove("show");
 }
+
 
 
 
@@ -632,11 +706,6 @@ async function fetchData(endpoint, method = 'GET', body = null, baseUrl = BASE_U
 // Fetch slices
 async function getSlices() {
     return await fetchData(`${ApiPaths.SLICES}`);
-}
-
-// Create a new slice
-async function createSlice(sliceData) {
-    return await fetchData(`${ApiPaths.SLICES}`, 'POST', sliceData);
 }
 
 // Update a slice

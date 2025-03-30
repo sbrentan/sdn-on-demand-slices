@@ -14,11 +14,7 @@ async function send_packet(packet_info){
     }
 
     if (packet_result != null){
-        steps = []
-        for(var i = 0; i < packet_result['steps'].length; i++){
-            steps.push(packet_result['steps'][i]['id'])
-        }
-        animatePacketPath(steps)
+        animatePacketPath(packet_result["steps"])
     }
 }
 

@@ -337,11 +337,5 @@ class APIController(ControllerBase):
         except ValueError as e:
             logging.error(f"Error getting recording: {e}")
             return self._json_response(status="404 Not Found")
-        
-        data = []
-        for node, packet in recording:
-            data.append(node.to_dict())
-            # for protocol in packet.protocols:
-            #     logging.info(f"Protocol: {protocol}")
                 
-        return self._json_response(data=data)
+        return self._json_response(data=recording)

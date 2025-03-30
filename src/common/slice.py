@@ -56,6 +56,7 @@ class Slice:
     max_rate: Optional[int] = None  # In bps
 
     name: Optional[str] = None
+    skipped_links: List[str] = None
 
     @property
     def rules_dict(self) -> dict:
@@ -105,6 +106,8 @@ class Slice:
     def __post_init__(self):
         if not self.name:
             self.name = self.id
+        if not self.skipped_links:
+            self.skipped_links = []
         self._validate_rules()
 
     def to_dict(self) -> dict:
@@ -115,7 +118,8 @@ class Slice:
             "nodes": self.switches + self.hosts,
             "active": self.active,
             "min_rate": self.min_rate,
-            "max_rate": self.max_rate
+            "max_rate": self.max_rate,
+            "skipped_links": self.skipped_links
         }
     
     def update_from_dict(self, data: dict):
@@ -126,6 +130,7 @@ class Slice:
         # TODO: implement hosts and switches update from data??
         # self.switches = data["switches"] if "nodes" in data else self.switches
         # self.hosts = data['hosts'] if "nodes" in data else self.hosts
+        # self.skipped_links = data["skipped_links"] if "skipped_links" in data else self.skipped_links
         self.active = bool(data["active"]) if "active" in data else self.active
         self.min_rate = data["min_rate"] if "min_rate" in data else self.min_rate
         self.max_rate = data["max_rate"] if "max_rate" in data else self.max_rate
@@ -144,6 +149,8 @@ class Slice:
         )
         if "name" in data:
             slice.name = data["name"]
+        if "skipped_links" in data:
+            slice.skipped_links = data["skipped_links"]
         return slice
     
     def _validate_rules(self):

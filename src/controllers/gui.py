@@ -21,7 +21,7 @@ class GUIController(ControllerBase):
         self.static_app = DirectoryApp(STATIC_DIR)
         self.jinja_env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
 
-    def get_data(self, endpoint, method="GET", data=None):
+    def get_data(self, endpoint, method="GET", data=None, timeout=60.0):
         url = f"http://{CONTROLLER_IP}:{CONTROLLER_PORT}{endpoint}"
 
         try:
@@ -29,6 +29,7 @@ class GUIController(ControllerBase):
                 method=method,
                 url=url,
                 data=json.dumps(data),  # type: ignore
+                timeout=timeout
             )
 
             response_status = response.status_code

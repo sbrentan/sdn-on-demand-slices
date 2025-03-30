@@ -152,12 +152,8 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         logging.info(f"Incoming connection: {in_connection}")
 
         if is_monitored_packet:
-            if in_connection.is_host_connection:
-                logging.info("Packet is monitored and is a host connection, adding additional registered step")
-                host_node = Network.get_instance().nodes[Node.get_host_id(in_connection.host_mac)]
-                self.monitoring_manager.add_recording_step(host_node, pkt)
-            switch_node = Network.get_instance().nodes[Node.get_switch_id(datapath.id)]
-            self.monitoring_manager.add_recording_step(switch_node, pkt)
+            switch_node = self.network.nodes[Node.get_switch_id(datapath.id)]
+            self.monitoring_manager.add_recording_step(switch_node, in_connection)
 
         # for each slice, set the mac to port for the incoming port
         slices = SliceUtils.get_slices_from_packet(switch_id, pkt, in_connection)
@@ -185,6 +181,13 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                 match = datapath.ofproto_parser.OFPMatch(**match_conditions)
                 if not is_monitored_packet:
                     PacketUtils.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
+                else:
+                    out_connection = [c for c in self.network.node_connections[switch_id] if c.is_host_connection and c.host_mac == dst]
+                    if out_connection:
+                        out_connection = out_connection[0]
+                        logging.info("Packet is monitored and is a host connection, adding additional registered step")
+                        host_node = self.network.nodes[Node.get_host_id(out_connection.host_mac)]
+                        self.monitoring_manager.add_recording_step(host_node, out_connection)
                 PacketUtils.send_package(msg, datapath, in_port, actions)
                 logging.info(f"Packet sent to slice {Slice.get_slice_id(slice)} from port {in_port} to port {out_port} to queue {queue_id}")
                 return
@@ -226,8 +229,8 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                     logging.info("Packet reached final destination, setting priority to DEFAULT")
                     if is_monitored_packet:
                         logging.info("Packet is monitored and is a host connection, adding additional registered step")
-                        host_node = Network.get_instance().nodes[Node.get_host_id(connection.host_mac)]
-                        self.monitoring_manager.add_recording_step(host_node, pkt)
+                        host_node = self.network.nodes[Node.get_host_id(connection.host_mac)]
+                        self.monitoring_manager.add_recording_step(host_node, connection)
             if not is_monitored_packet:
                 PacketUtils.add_flow(datapath, priority, match, actions)
             
