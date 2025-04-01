@@ -1,0 +1,29 @@
+{
+  "slices": [
+      {
+          "id": "slice1",
+          "name": "Slice ICMP/TCP",
+          "switches": ["s1", "s2", "s4", "s5", "s6", "s7", "s8"],
+          "hosts": ["00:00:00:00:00:01", "00:00:00:00:00:02", "00:00:00:00:00:03", "00:00:00:00:00:04"],
+          "min_rate": 10000,
+          "max_rate": 10000,
+          "rules": {
+              "allowed_protocols": ["ICMP", "TCP"]
+          },
+          "skipped_links": [
+              "s5-s7"
+          ]
+      },
+      {
+          "id": "slice2",
+          "name": "Slice UDP",
+          "switches": ["s1", "s2", "s3", "s5","s7" , "s8"],
+          "hosts": ["00:00:00:00:00:01", "00:00:00:00:00:02", "00:00:00:00:00:03", "00:00:00:00:00:04"],
+          "min_rate": 1000000,
+          "max_rate": 1000000,
+          "rules": {
+              "allowed_protocols": ["UDP"]
+          }
+      }
+  ]
+}

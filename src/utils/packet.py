@@ -2,7 +2,8 @@ import logging
 
 from ryu.topology.switches import Switch
 
-from common.constants import FlowPriority
+from common.constants import FlowPriority, DSCP_TAG_VALUE
+
 
 class PacketUtils:
 
@@ -46,6 +47,15 @@ class PacketUtils:
             parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
         ]
         PacketUtils.add_flow(switch.dp, FlowPriority.TABLE_MISS.value, match, actions)
+        
+        # Add monitored packet flow entry
+        match = parser.OFPMatch(eth_type=0x0800, ip_dscp=DSCP_TAG_VALUE >> 2)  # IPv4 with DSCP 32
+        actions = [
+            parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
+        ]
+        priority = FlowPriority.MONITORED_PACKET.value
+        logging.info(f"Adding flow with priority {priority} and match {match}")
+        PacketUtils.add_flow(switch.dp, priority, match, actions)
 
     @staticmethod
     def send_package(msg, datapath, in_port, actions):
