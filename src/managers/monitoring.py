@@ -75,11 +75,14 @@ class MonitoringManager:
             previous_node = in_connection.src[1] if node.node_id == in_connection.dst[1].node_id else in_connection.dst[1]
             logging.info(f"Previous node: {previous_node.node_id}")
             # Look for previous node id in recording using a queue
-            def find_and_update_path(node, target_id, path):
+            def find_and_update_path(node, target_id, path, level=0):
+                if level == 20:
+                    logging.error("Maximum recursion depth reached while finding path")
+                    return False
                 path.append(node["id"])
                 found = False
                 for child in node["children"]:
-                    if find_and_update_path(child, target_id, path):
+                    if find_and_update_path(child, target_id, path, level + 1):
                         found = True
                 if node["id"] == target_id:
                     found = True

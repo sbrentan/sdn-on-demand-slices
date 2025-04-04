@@ -19,8 +19,8 @@
             "name": "Slice ICMP/TCP",
             "switches": ["s1", "s3", "s4"],
             "hosts": ["00:00:00:00:00:01", "00:00:00:00:00:02", "00:00:00:00:00:03", "00:00:00:00:00:04"],
-            "min_rate": 1000,
-            "max_rate": 1000,
+            "min_rate": 1000000,
+            "max_rate": 1000000,
             "rules": {
                 "allowed_protocols": ["ICMP", "TCP"]
             }

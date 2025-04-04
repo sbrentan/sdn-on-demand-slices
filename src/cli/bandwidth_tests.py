@@ -5,6 +5,8 @@ import signal
 from mininet.log import output
 from mininet.net import Mininet
 
+from common import PacketInfo
+
 class BandwidthTest(ABC):
 
     registered_tests = {}
@@ -32,13 +34,50 @@ class BandwidthTest(ABC):
         return test.description
 
     @staticmethod
-    def run_test(test_id: str, mn: Mininet, line: str):
-        test = BandwidthTest.registered_tests.get(test_id)
-        if not test:
-            print(f"Test with test_id {test_id} not found")
-            return
-        output(f"- {test.description}\n")
-        test._run_test(mn, line)
+    def run_test(test_id: str, mn: Mininet, line: str = None, packet_info: PacketInfo = None):
+        if test_id is None:
+            if packet_info is None:
+                print("No test_id or packet_info provided")
+                return
+            src_host = [h for h in mn.hosts if h.MAC() == packet_info['src_mac']][0]
+            dst_host = [h for h in mn.hosts if h.MAC() == packet_info['dst_mac']][0]
+            result = BandwidthTest.start_bandwidth_test(src_host, dst_host, packet_info['protocol'], packet_info['dst_port'])
+
+            output(f"Bandwidth test result:\n{result}\n")
+        else:
+            test = BandwidthTest.registered_tests.get(test_id)
+            if not test:
+                print(f"Test with test_id {test_id} not found")
+                return
+            output(f"- {test.description}\n")
+            test._run_test(mn, line)
+
+    @staticmethod
+    def start_bandwidth_test(src_host, dst_host, protocol, dst_port):
+        """
+        Start a bandwidth test between two hosts
+        :param src_host: the source host
+        :param dst_host: the destination host
+        :param protocol: the protocol to use (TCP or UDP)
+        :param dst_port: the destination port
+        """
+        def test():
+            proto_str = "-u -b 1000M" if protocol == "UDP" else ""
+            dst_host.sendCmd(f"iperf -s {proto_str} -p {dst_port} -t 15")
+            src_host.sendCmd(f"iperf -c {dst_host.IP()} {proto_str} -p {dst_port} -t 10 -i 1")
+            result = src_host.waitOutput()
+            server_out = dst_host.waitOutput()
+            if server_out:
+                output(f"\n{server_out}\n")
+            return result
+            
+        result = BandwidthTest.run_with_timeout(30, test)
+        if result is None:
+            src_host.sendCmd("pkill iperf")
+            dst_host.sendCmd("pkill iperf")
+            src_host.waitOutput()
+            dst_host.waitOutput()
+        return result
 
     @classmethod
     @abstractmethod
@@ -67,49 +106,17 @@ class BandwidthTest(ABC):
             signal.alarm(0)
 
 
-class BandwidthTest1(BandwidthTest):
-    test_id = "1"
-    description = "Test 1 description"
+# class BandwidthTest1(BandwidthTest):
+#     test_id = "1"
+#     description = "Test 1 description"
 
-    @classmethod
-    def _run_test(cls, mn: Mininet, line: str):
-        server = mn.getNodeByName("h3")
-        client = mn.getNodeByName("h1")
+#     @classmethod
+#     def _run_test(cls, mn: Mininet, line: str):
+#         server = mn.getNodeByName("h3")
+#         client = mn.getNodeByName("h1")
 
-        def test():
-            return mn.iperf((client, server), l4Type='UDP', udpBw='20M', seconds=10, port=9999)
+#         def test():
+#             return cls.start_bandwidth_test(client, server, 'UDP', 9999)
         
-        result = cls.run_with_timeout(15, test)
-        output(f"Bandwidth test result: {result}\n")
-
-
-class BandwidthTest2(BandwidthTest):
-    test_id = "2"
-    description = "Test 2 description"
-
-    @classmethod
-    def _run_test(cls, mn: Mininet, line: str):
-        server = mn.getNodeByName("h3")
-        client = mn.getNodeByName("h1")
-
-        def test():
-            return mn.iperf((client, server), l4Type='UDP', udpBw='20M', seconds=10, port=9997)
-        
-        result = cls.run_with_timeout(15, test)
-        output(f"Bandwidth test result: {result}\n")
-
-
-class BandwidthTest3(BandwidthTest):
-    test_id = "3"
-    description = "Test 3 description"
-
-    @classmethod
-    def _run_test(cls, mn: Mininet, line: str):
-        server = mn.getNodeByName("h3")
-        client = mn.getNodeByName("h1")
-
-        def test():
-            return mn.iperf((client, server), l4Type='UDP', udpBw='20M', seconds=10, port=9997)
-        
-        result = cls.run_with_timeout(15, test)
-        output(f"Bandwidth test result: {result}\n")
+#         result = cls.run_with_timeout(15, test)
+#         output(f"Bandwidth test result: {result}\n")

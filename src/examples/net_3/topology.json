@@ -1,0 +1,40 @@
+{
+    "switches": [
+        {"id": "s1", "dpid": "0000000000000001"},
+        {"id": "s2", "dpid": "0000000000000002"},
+        {"id": "s3", "dpid": "0000000000000003"},
+        {"id": "s4", "dpid": "0000000000000004"},
+        {"id": "s5", "dpid": "0000000000000005"},
+        {"id": "s6", "dpid": "0000000000000006"},
+        {"id": "s7", "dpid": "0000000000000007"},
+        {"id": "s8", "dpid": "0000000000000008"},
+        {"id": "s9", "dpid": "0000000000000009"},
+        {"id": "s10", "dpid": "000000000000000A"},
+        {"id": "s11", "dpid": "000000000000000B"}
+    ],
+    "hosts": [
+        {"id": "h1", "connected_to": "s1"},
+        {"id": "h2", "connected_to": "s1"},
+        {"id": "h3", "connected_to": "s11"},
+        {"id": "h4", "connected_to": "s11"}
+    ],
+    "links": [
+      {"node1": "s1", "node2": "s2", "bandwidth": 1000},
+      {"node1": "s2", "node2": "s3", "bandwidth": 1000},
+      {"node1": "s3", "node2": "s4", "bandwidth": 1000},
+      {"node1": "s4", "node2": "s11", "bandwidth": 1000},
+      {"node1": "s1", "node2": "s5", "bandwidth": 500},
+      {"node1": "s5", "node2": "s6", "bandwidth": 500},
+      {"node1": "s6", "node2": "s7", "bandwidth": 500},
+      {"node1": "s7", "node2": "s11", "bandwidth": 500},
+      {"node1": "s1", "node2": "s8", "bandwidth": 100},
+      {"node1": "s8", "node2": "s9", "bandwidth": 100},
+      {"node1": "s9", "node2": "s10", "bandwidth": 100},
+      {"node1": "s10", "node2": "s11", "bandwidth": 100},
+      {"node1": "s1", "node2": "h1", "bandwidth": 200},
+      {"node1": "s1", "node2": "h2", "bandwidth": 200},
+      {"node1": "s11", "node2": "h3", "bandwidth": 200},
+      {"node1": "s11", "node2": "h4", "bandwidth": 200}
+         
+    ]
+  }

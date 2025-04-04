@@ -141,7 +141,7 @@ class QueueUtils:
             "queues": [queue.to_queue_dict() for queue in queues]
         }
 
-        # TODO: decide what do do (keep OVSBridge or use the REST API) ??? Consider that OVSBridge is 2x faster
+        # TODO: decide what do do (keep OVSBridge or use the REST API) ???
 
         # data = {
         #     "port_name": port_name.decode("utf-8"),

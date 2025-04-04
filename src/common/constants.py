@@ -19,6 +19,8 @@ GUI_BASE_URL = "/gui"
 STATIC_DIR = "gui/static"
 TEMPLATE_DIR = "gui/templates"
 
+SKIP_ADD_FLOW_ON_MONITORING = False  # Skip adding flow rules on monitoring
+
 class FlowPriority(Enum):
     TABLE_MISS = 0
     FLOODING = 1

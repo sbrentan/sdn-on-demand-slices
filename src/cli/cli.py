@@ -62,19 +62,58 @@ class CustomCLI(CLI):
         else:
             output("All nodes are ready.\n\n")
 
+    def help_bwtest(self):
+        """Display help for the bwtest command."""
+        output("Custom command to perform bandwidth tests.\n")
+        output("Usage: bwtest [-h] [-p PROTOCOL] [-port DST_PORT] [-src SRC] [-dst DST]\n")
+
     def do_bwtest(self, line):
         """
         Custom command to perform bandwidth tests.
         Usage: bwtest <test_id>
         """
-        valid_test_ids = BandwidthTest.get_test_ids()
-        test_id = line.strip()
-        if not test_id or not test_id.isdigit():
-            output(f"Please provide a valid test ID from {valid_test_ids}\n")
+        parser = argparse.ArgumentParser(description="Trace a packet through the network.")
+        # parser.add_argument('-test_id', type=str, help="Test ID of the bandwidth test.")
+        parser.add_argument("-p", "--protocol", type=str, help="Protocol of the bandwidth test (TCP or UDP).")
+        parser.add_argument("-port", "--dst_port", type=int, help="Destination port of the packet.")
+        parser.add_argument("-src", "--src", type=str, help="Source node of the packet.")
+        parser.add_argument("-dst", "--dst", type=str, help="Destination node of the packet.")
+        args, argv = parser.parse_known_args(line.split())
+        if argv:
+            output('unrecognized arguments: %s\n' % ' '.join(argv))
             return
-        output("Performing bandwidth test %s...\n" % test_id)
-        BandwidthTest.run_test(test_id, self.mn, line)
-        return
+        # valid_test_ids = BandwidthTest.get_test_ids()
+        # if not args.test_id:
+        protocol, dst_port, src, dst = args.protocol, args.dst_port, args.src, args.dst
+        if not all([protocol, dst_port, src, dst]):
+            output("Please provide all arguments for the bandwidth test (protocol, port, src, dst).\n")
+            return
+        if protocol not in ["TCP", "UDP"]:
+            output("Please provide a valid protocol (TCP or UDP).\n")
+            return
+        if not isinstance(dst_port, int):
+            output("Please provide a valid destination port.\n")
+            return
+        if not self.mn.getNodeByName(src) or not self.mn.getNodeByName(dst):
+            output("Please provide valid source and destination nodes.\n")
+            return
+        src_mac = self.mn.getNodeByName(src).MAC()
+        dst_mac = self.mn.getNodeByName(dst).MAC()
+        packet_info = PacketInfo(
+            protocol=protocol,
+            dst_port=dst_port,
+            src_mac=src_mac,
+            dst_mac=dst_mac,
+        )
+        output("Performing bandwidth test...\n")
+        BandwidthTest.run_test(test_id=None, mn=self.mn, packet_info=packet_info)
+        # return
+        # elif not args.test_id.isdigit():
+        #     output(f"Please provide a valid test ID from {valid_test_ids}\n")
+        #     return
+        # output("Performing bandwidth test %s...\n" % args.test_id)
+        # BandwidthTest.run_test(args.test_id, self.mn, line=line)
+        # return
 
     def do_reset(self, line):
         """Custom command to reset the network flows and queues."""
@@ -152,7 +191,6 @@ def make_host_send_packet(mn: Mininet, cli: CustomCLI, packet_info: PacketInfo) 
     # run python script inside node h1
     sp_str = f"-sp {packet_info.get('src_port')}" if packet_info.get("src_port") else ""
     source_host.sendCmd(f"python3 cli/send_packet.py -ip {dst_ip} -t {protocol} -p {port} {sp_str}")
-    # TODO: override output to avoid printing in the console
     cli.waitForNode(source_host)
 
     time.sleep(1)

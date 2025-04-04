@@ -98,9 +98,10 @@ class APIController(ControllerBase):
             logging.error(f"Error updating slice {slice_id}: not found")
             return self._json_response(status="404 Not Found")
         
-        affected_switches = self.slices_manager.update_slice(slice_match[0])
         slice_match[0].update_from_dict(slice_data)
+        affected_switches = self.slices_manager.update_slice(slice_match[0])
         # TODO: when implementing the update of slice nodes, restore the following call:
+        #       Attention: update_from_dict should be run before update_slice
         # self.slices_manager.update_slice(slice_match[0], switches_to_skip=affected_switches)
         # Calling two times `update_slice` to be sure to update and reset all queues of both previous and current affected switches
 

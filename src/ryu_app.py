@@ -18,7 +18,7 @@ from managers import NetworkManager, SlicesManager, MonitoringManager
 from controllers import APIController, GUIController
 from utils import SliceUtils, QueueUtils, TopologyUtils, PacketUtils
 from common import Network, Node, Slice, Protocol, Queue
-from common.constants import OVSDB_TIMEOUT, FlowPriority, DSCP_TAG_VALUE
+from common.constants import OVSDB_TIMEOUT, FlowPriority, DSCP_TAG_VALUE, SKIP_ADD_FLOW_ON_MONITORING
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -179,9 +179,9 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                     datapath.ofproto_parser.OFPActionOutput(out_port)
                 ]
                 match = datapath.ofproto_parser.OFPMatch(**match_conditions)
-                if not is_monitored_packet:
+                if not SKIP_ADD_FLOW_ON_MONITORING or not is_monitored_packet:
                     PacketUtils.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
-                else:
+                elif is_monitored_packet:
                     out_connection = [c for c in self.network.node_connections[switch_id] if c.is_host_connection and c.host_mac == dst]
                     if out_connection:
                         out_connection = out_connection[0]
@@ -231,7 +231,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                         logging.info("Packet is monitored and is a host connection, adding additional registered step")
                         host_node = self.network.nodes[Node.get_host_id(connection.host_mac)]
                         self.monitoring_manager.add_recording_step(host_node, connection)
-            if not is_monitored_packet:
+            if not SKIP_ADD_FLOW_ON_MONITORING or not is_monitored_packet:
                 PacketUtils.add_flow(datapath, priority, match, actions)
             
             # flood the packet to all specified connections (after adding flows) 
@@ -239,7 +239,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
         else:
             logging.info("No outgoing connections found for the packet, DROPPING it")
             drop_match = datapath.ofproto_parser.OFPMatch(**self._get_match_conditions_for_packet(pkt, in_port, slices))
-            if not is_monitored_packet:
+            if not SKIP_ADD_FLOW_ON_MONITORING or not is_monitored_packet:
                 PacketUtils.add_flow(datapath, FlowPriority.DROP.value, drop_match, [])
 
     def _get_port_for_mac_and_slice(self, switch_id: str, slice_name: str, mac: str) -> Optional[Tuple[int, int]]:
@@ -331,10 +331,10 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                 logging.info(f"[_get_match_condictions_for_packet] Slices: {slices}")
                 logging.info(f"[_get_match_condictions_for_packet] {[s.rules['allowed_ports'] for s in slices]}")
                 logging.info(f"[_get_match_condictions_for_packet] {[s.rules['allowed_services'] for s in slices]}")
-                if any([s.rules['allowed_ports'] is not None for s in slices]) or any([s.rules["allowed_services"] and dst in s.rules["allowed_services"] for s in slices]):
+                if not slices or any([s.rules['allowed_ports'] for s in slices]) or any([s.rules["allowed_services"] and dst in s.rules["allowed_services"] for s in slices]):
                     dst_port = l4_packet.dst_port  # type: ignore
                     conditions.update({("udp_dst" if pkt_protocol == Protocol.UDP else "tcp_dst"): dst_port})
-                if any([s.rules["allowed_services"] and src in s.rules["allowed_services"] for s in slices]):
+                if not slices or any([s.rules["allowed_services"] and src in s.rules["allowed_services"] for s in slices]):
                     src_port = l4_packet.src_port  # type: ignore
                     conditions.update({("udp_src" if pkt_protocol == Protocol.UDP else "tcp_src"): src_port})
             logging.info(f"[_get_match_condictions_for_packet] Match conditions for packet: {json.dumps(conditions, indent=4)}")
