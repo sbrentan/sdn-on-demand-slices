@@ -1,21 +1,87 @@
 # sdn-on-demand-slices
 SDN On-demand dynamic slicing software using comnetsemu.
 
-This project is realized for the Networking 2 Master course of University of Trento
+This project is realized for the Networking 2 Master course of University of Trento and was developed through the combined effort of: [Simone Brentan](https://github.com/sbrentan), [Matteo Costalonga](https://github.com/wamuumu), [Alex Reichert](https://github.com/Faerye0)
 
-## Project setup
 
-Install all the dependencies with the following:
+# Project setup
+
+This section will go through the steps to set up the project on your local machine.
+
+To run this project locally, you need to have a simulation environment set up where to run Mininet and Ryu controller. As a simulation environment, we suggest using **ComnetSemu**.
+
+ComnetSemu is a virtual machine that runs on VirtualBox and provides a pre-configured environment for network simulations.
+
+## Comnetsemu installation
+
+This project installation and setup has been tested only within a `Windows` environment.
+
+Before starting, make sure you have VirtualBox and Vagrant installed on your machine.
+* You can download **Virtualbox** from its offcial [website](https://www.virtualbox.org/).
+* You can download **Vagrant** from its official [website](https://www.vagrantup.com/).
+
+To run the virtual machine with ComnetSemu, you can go to this [github repository]("https://github.com/stevelorenz/comnetsemu") and clone it to your local machine.
+```sh
+git clone https://github.com/stevelorenz/comnetsemu
+```
+
+After cloning the repository, you need to setup and build the virtual machine with Vagrant.
+
+Open the Vagrantfile in the cloned repository and add this following line in the correct section.
+```vagrantfile
+comnetsemu.vm.network "forwarded_port", guest: 8080, host: 8080
+```
+This is used to forward the port 8080 to the host machine and make the web interface of ComnetSemu accessible from your browser.
+
+Additionally, we suggest to add this line in the Vagrantfile to increase the boot timeout, as the virtual machine takes a while to boot up:
+```vagrantfile
+config.vm.boot_timeout = 3600
+```
+You can add this line at around line 102, after the `config.vm.provider "virtualbox"` section.
+
+After modifying the Vagrantfile, you can start the virtual machine by running the following command in the terminal inside the cloned repository:
+```sh
+vagrant up
+```
+
+This will download the necessary files and start the virtual machine. It may take a while, so be patient.
+
+## Project installation
+
+After the virtual machine is up and running, you can access it via SSH with the following command:
+```sh
+vagrant ssh
+```
+
+Once you are inside the virtual machine, go inside the `app` folder in the `comnetsemu` directory:
+```sh
+cd comnetsemu/app
+```
+
+Now you can clone this repository inside the `app` folder:
+```sh
+git clone https://github.com/sbrentan/sdn-on-demand-slices.git
+```
+
+After cloning the repository, go inside the cloned directory and install the necessary dependencies:
 ```sh
 pip install -r requirements.txt
 ```
 
-In order to make wsgi accessible from the host machine, remember to add the following forwarded port into the Vagrantfile:
-```vagrantfile
-comnetsemu.vm.network "forwarded_port", guest: 8080, host: 8086
+Finally, you can start the application by running the apposite launcher script:
+```sh
+./launcher.sh
 ```
+> !!! Running the launcher script in this way will throw an error, saying that you have to pass the `--net` argument for it to work.
+>
+> This argument is used to specify the network configuration to apply using `Mininet`. See the following section for more details.
 
-## Main commands
+# Running the project
+
+TODO
+
+
+# General mininet and terminal commands
 
 
 Listen on switch `s0` on port `6653` and prints output in `test.pcap`
