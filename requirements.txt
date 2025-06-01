@@ -2,3 +2,5 @@ httpx
 ryu
 mininet
 jinja2
+eventlet==0.34.3
+gunicorn==21.2.0

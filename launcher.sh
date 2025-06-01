@@ -7,11 +7,11 @@ module_path="$(pwd)"
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --net)
-            if [[ "$2" =~ ^[1-4]$ ]]; then
+            if [[ "$2" =~ ^[1-3]$ ]]; then
                 net_value="$2"
                 shift 2
             else
-                echo "Error: Invalid value for --net. Allowed values are: 1, 2, 3, 4."
+                echo "Error: Invalid value for --net. Allowed values are: 1, 2, 3."
                 exit 1
             fi
             ;;
@@ -23,7 +23,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [ -z "$net_value" ]; then
-    echo "Error: --net argument is required. Possible values are: 1, 2, 3, 4."
+    echo "Error: --net argument is required. Possible values are: 1, 2, 3."
     exit 1
 fi
 
@@ -68,10 +68,11 @@ sudo ovs-vsctl set-manager ptcp:6632
 
 SLICES_FILE="$slices_file" ryu-manager --observe-links ryu_app.py > "$log_file" 2>&1 &
 
-sleep 2
+sleep 5
 
 echo "Starting Mininet network..."
 sudo python3 network.py --topology-file "$topology_file"
+
 
 
 ################### Clean up

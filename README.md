@@ -20,7 +20,7 @@ Before starting, make sure you have VirtualBox and Vagrant installed on your mac
 * You can download **Virtualbox** from its offcial [website](https://www.virtualbox.org/).
 * You can download **Vagrant** from its official [website](https://www.vagrantup.com/).
 
-To run the virtual machine with ComnetSemu, you can go to this [github repository]("https://github.com/stevelorenz/comnetsemu") and clone it to your local machine.
+To run the virtual machine with ComnetSemu, you can go to this [github repository](https://github.com/stevelorenz/comnetsemu) and clone it to your local machine.
 ```sh
 git clone https://github.com/stevelorenz/comnetsemu
 ```
@@ -37,7 +37,7 @@ Additionally, we suggest to add this line in the Vagrantfile to increase the boo
 ```vagrantfile
 config.vm.boot_timeout = 3600
 ```
-You can add this line at around line 102, after the `config.vm.provider "virtualbox"` section.
+You can add this line at around line 102, after the `config.vm.provider "virtualbox"` section. This will increase the boot timeout to 1 hour, which should be enough for the virtual machine to start up.
 
 After modifying the Vagrantfile, you can start the virtual machine by running the following command in the terminal inside the cloned repository:
 ```sh
@@ -45,6 +45,8 @@ vagrant up
 ```
 
 This will download the necessary files and start the virtual machine. It may take a while, so be patient.
+
+> **Note**: After running the `vagrant up` command the terminal may hang for a while and sometimes it freezes. It can be useful to open the VirtualBox application manually (just opening the application should be enough) to unfreeze the terminal.
 
 ## Project installation
 
@@ -63,22 +65,57 @@ Now you can clone this repository inside the `app` folder:
 git clone https://github.com/sbrentan/sdn-on-demand-slices.git
 ```
 
+Install mininet and the openvswitch package for `superuser`:
+```sh
+sudo apt update
+sudo apt install openvswitch-switch
+sudo apt install mininet
+```
+
 After cloning the repository, go inside the cloned directory and install the necessary dependencies:
 ```sh
-pip install -r requirements.txt
+sudo pip install -r requirements.txt
 ```
 
 Finally, you can start the application by running the apposite launcher script:
 ```sh
 ./launcher.sh
 ```
-> !!! Running the launcher script in this way will throw an error, saying that you have to pass the `--net` argument for it to work.
->
-> This argument is used to specify the network configuration to apply using `Mininet`. See the following section for more details.
+
+## Launcher errors
+
+If, when running the launcher script, you get an error like this:
+```bash
+$ ./launcher.sh
+-bash: ./launcher.sh: /bin/bash^M: bad interpreter: No such file or directory
+```
+ 
+It means you need to fix the end of line characters in the `launcher.sh` file from `CLRF` to `LF`. This can be done with the following command:
+```sh
+sed -i 's/\r$//' launcher.sh
+```
+
+Instead, if you get an error like this:
+```bash
+$ ./launcher.sh
+Error: --net argument is required. Possible values are: 1, 2, 3.
+```
+
+This is correct and expected behavior, as the launcher script requires a network configuration to be specified in order to run the application.
+
+This argument is used to specify the network configuration to apply using `Mininet`. See the following section for more details.
+
 
 # Running the project
 
-TODO
+Three different demo scenarios have been implemented in this project, each with its own network configuration. You can run them by passing the `--net` argument to the launcher script, where the possible values are `1`, `2` or `3`. For example:
+```sh
+./launcher.sh --net 1
+```
+
+This will start the application with the first network configuration, which is a simple topology with 4 hosts and 4 switches.
+
+
 
 
 # General mininet and terminal commands
