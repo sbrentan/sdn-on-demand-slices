@@ -66,7 +66,7 @@ log_file="logs/controller_$timestamp.log"
 echo "Starting Ryu controller..."
 sudo ovs-vsctl set-manager ptcp:6632
 
-SLICES_FILE="$slices_file" ryu-manager --observe-links ryu_app.py > "$log_file" 2>&1 &
+sudo env SLICES_FILE="$slices_file" ryu-manager --observe-links ryu_app.py > "$log_file" 2>&1 &
 
 sleep 5
 
@@ -77,5 +77,5 @@ sudo python3 network.py --topology-file "$topology_file"
 
 ################### Clean up
 echo "Cleaning up..."
-sudo mn -c 
+sudo mn -c > /dev/null 2>&1
 echo "Done."

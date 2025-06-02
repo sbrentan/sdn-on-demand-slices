@@ -32,7 +32,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         links: await getLinks()
     };
 
-    slices = await getSlices();
+    try {
+        slices = await getSlices();
+    } catch (error) {
+        slices = [];
+    }
 
     const sliceList = document.getElementById("slice-list");
     slices.forEach((slice, index) => {

@@ -115,6 +115,106 @@ Three different demo scenarios have been implemented in this project, each with 
 
 This will start the application with the first network configuration, which is a simple topology with 4 hosts and 4 switches.
 
+The output of the command will be something like this:
+```bash
+vagrant@comnetsemu:~/comnetsemu/app/sdn-on-demand-slices$ ./launcher.sh --net 1
+Starting Ryu controller...
+Starting Mininet network...
+
+Waiting for all nodes to be correctly set up and available...
+Attempt 2/5...
+All nodes are ready.
+
+Polling APIs for packets requests...
+mininet>
+```
+
+After starting the application, what basically happens is the following:
+* The Ryu controller is started, which is responsible for managing the network and handling the OpenFlow messages.
+* Mininet is started and the network is created with the specified configuration, which creates the virtual hosts and switches.
+* The controller waits for all nodes to be correctly set up and available, which may take a few seconds. To do this, it tries to ping all hosts in the network until they are reachable.
+    * This takes a while because the network becomes available only after all the nodes/switches are connected and the Ryu controller handled the creation of the queues and flows.
+* A thread is started from within the Mininet executable (`Polling APIs for packets requests...`) that polls the Ryu controller for packets requests. This is used for sending custom packets to the network and to monitor the traffic.
+
+When closing the application, you can do it by pressing `Ctrl + D` in the terminal or by typing `exit` in the Mininet console. This will stop the Mininet network and the Ryu controller, and exit the application. Additionally, it will run the `mn -c` command to clear the Mininet state, which is useful to avoid issues when restarting the application.
+
+# Application GUI
+
+The application provides a simple web interface to interact with the network and send custom packets. You can access it by opening your browser and going to `http://localhost:8080`.
+
+You will see something like this:
+
+![Application GUI](images/application_gui.png)
+
+* The left side of the interface shows a menu with the list of slices created in the network. The `New Slice +` button allows you to create a new slice. The green circle next to each slice indicates that the slice is active, while a red circle indicates that the slice is inactive.
+* The center of the interface shows the network topology, with the hosts and switches connected to each other.
+* In the top-right corner, there are some buttons to control the network canvas, such as zooming in and out, resetting the view, and saving the current topology displacement. This is useful to keep the topology in a specific position when refreshing the page.
+* Under the page title, there is a button that allows you to send a packet in the network and monitor its traffic. More details on this in the following [Sending a packet](#sending-a-packet) section.
+
+When clicking either a `slice` in the left menu or anything in the network topology (`host`, `switch` or `link`), the right side of the interface shows the details of the selected element.
+
+If you click on a `slice`, you will see something like this:
+
+![Slice details](images/slice_menu.png)
+
+## Details Menus
+
+The possible details menus are:
+
+![Slice details](images/details_menus.png)
+
+In the `Host` and `Switch` details menus, you can edit the name of the element, which is useful to identify it in the network topology. You can also see the Datapath ID for the switch and the IP/MAC address for the host.
+
+In the `Link` details menu, you can see the name of the two nodes connected as well as the list of slices that are using that link. This is useful to understand which slices are sharing the same link and which bandwidth they are using.
+
+In the `Slice` details menu, you can see the name of the slice and the minumum/maximum bandwidth that the slice can use (expressed in `bits/sec`). You can also see a list of **RULES** that are applied to the slice, which are used to filter the traffic and apply the bandwidth limits. The rules are explained in more detail in the next section. In this menu, in addition to the `Edit` button, there is also a `Delete` button that allows you to delete the slice and a `Enable/Disable` button that allows you to enable or disable the slice. When a slice is disabled, it will not be able to send or receive traffic, but it will still be present in the network and can be enabled again later.
+
+## Slice Rules
+
+The slice rules are used to filter the traffic and define which packets are allowed to pass through the slice. Three types of rules are available:
+
+* **PROTOCOL**: This rule allows you to filter the traffic based on the protocol used in the packet. You can select from a list of protocols (TCP, UDP, ICMP).
+* **PORT**: This rule allows you to filter the traffic based on the port used in the packet.
+* **SERVICE**: This rule allows you to filter the traffic based on the service the packet needs to reach. As shown in the above image, a service is defined by a combination of ip address and a list of ports. This is useful to define a specific service that the slice can access, such as a web server or a database.
+
+> **SERVICES** have been introduced as a different mechanism to allow packets to pass. In particular, this type of rule only needs either the sender or the receiver to match the service, while the other host is not checked.
+
+> A simple combination of **PROTOCOL** and **PORT** rules would instead require both the sender and the receiver to match the same protocol and port, which is not always desired.
+
+In order for a packet to be allowed to pass through the slice, it must match **ALL** the rules defined in it. For example, if you define a slice with a PROTOCOL rule set to TCP and a PORT rule set to 80, only TCP packets on port 80 will be allowed to pass through the slice.
+
+## Editing a slice
+
+When clicking the `Edit` button in the slice details menu, you can edit the name of the slice, the minimum and maximum bandwidth (expressed in `bits/sec`), and the list of rules applied to the slice.
+
+![Editing a slice](images/edit_slice.png)
+
+You can add a new rule by clicking the `+` button next to each list of rules. This will open a modal window where you can insert the details of the rule. If you want to delete a rule, you can click the `x` button next to the rule in the list.
+
+When you are done editing the slice, you can click the `Confirm` button to save the changes. The slice will be updated in the network and the new rules will be applied to the traffic.
+
+> Both when editing a slice and when enabling/disabling/deleting it, the page will show a loading spinner while the changes are being applied to the network. This is because the Ryu controller needs to update the OpenFlow rules and queues in the switches and this may take a few seconds.
+
+## Adding a new slice
+
+To create a new slice, you can click the `New Slice +` button in the left menu. This will open the right side menu with the details of the new slice, but it also allows the user to select the hosts and switches that will be part of the slice. The selected hosts and switches will be highlighted in the network topology.
+
+![Creating a slice](images/create_slice.gif)
+
+After selecting the hosts and switches, you can edit the name of the slice, the minimum and maximum bandwidth (expressed in `bits/sec`), and the list of rules applied to the slice. The rules can be added by clicking the `+` button next to each list of rules, as explained in the previous section.
+
+When you are done creating the slice, you can click the `Confirm New Slice` button  in the left menu to save the new slice. The slice will be added to the network and the new rules will be applied to the traffic.
+
+> In the same way that happens when editing a slice, a loading spinner will be shown to wait for the Ryu controller to update the OpenFlow rules and queues in the switches.
+
+## Sending a packet
+
+TODO
+
+
+
+
+
 
 
 
