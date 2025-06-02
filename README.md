@@ -209,14 +209,79 @@ When you are done creating the slice, you can click the `Confirm New Slice` butt
 
 ## Sending a packet
 
+To send a custom packet in the network, you can click the `Send Packet` button in the top-right corner of the interface. This will open a modal window where you can select:
+* The **Protocol** to use for the packet (TCP, UDP, ICMP).
+* The **Source Host** from which the packet will be sent.
+* The **Destination Host** to which the packet will be sent.
+* If `UDP` or `TCP` is selected, you can also specify the **Source Port** (optional) and the **Destination Port** (required) for the packet.
+
+When clicking the `Send` button, the packet will be sent in the network and the traffic will be monitored.
+
+### TCP Packet
+![Sending a packet](images/send_packet_net1_tcp.gif)
+
+### UDP Packet
+![Sending a packet](images/send_packet_net1_udp.gif)
+
+## How does packet tracing works?
+
+In order to have the Ryu application correctly monitor a packet, a specific mechnism has been implemented.
+
+In general, what happens is:
+
+1. The web interface sends a request to the Ryu controller APId to send a packet with the specified parameters.
+2. The Ryu controller receives the request and stores this new packet.
+3. The thread that has been spawned by the `Mininet` executable (the one that printed `Polling APIs for packets requests...` at application startup) polls the Ryu controller API for new packets requests every second.
+4. When a new packet request is found, the polling thread sends the packet in the network using the `send_packet.py` script, which is located in the `commands` folder of the project. This script is executed in the Mininet environment inside the source host, which is the host that will send the packet.
+5. The `send_packet.py` script builds the packet with the specified parameters and sends it in the network using the python `socket` library. Additionally, a special tag is set to track the packet (more details on this in the following note).
+6. The Ryu controller receives and recognizes the packet as a monitored packet, and progressively stores the packet's position in the network at each step.
+7. After a while (empirically set to 1 second), the thread requests the Ryu controller API for the packet's monitoring information and finalizes it, making it available for the web interface.
+8. The web interface, after first sending the send_packet request, started polling the Ryu controller API for the packet's monitoring status. When the packet is finalized, the web interface receives the monitoring information and produces the packet animation in the network topology.
+
+> **Note**: In order to be able to track this packet, the script needs also to set a recognizable `tag` in it. In such a way, openflow rules can be set to match this tag and redirect the packet to the Ryu controller for monitoring events. All packets sent in such a manner will therefore always be redirected to the Ryu controller even if the openflow rules matching this packet already exist in the switches.
+
+> For no particular reason, we decided to set the `DSCP tag` of the packet to `32`:
+>
+> `sock.setsockopt(socket.IPPROTO_IP, socket.IP_TOS, 32)`
+>
+> The Ryu controller then, when first setting up the switches, added both the default redirect rule as well as this specific rule to match the DSCP tag `8`(`32` shifted by 2 bits) and redirect the packet to the controller with an higher priority with respect to all the other rules:
+>
+> ```python
+> match = parser.OFPMatch(eth_type=0x0800, ip_dscp=DSCP_TAG_VALUE >> 2)  # IPv4 with DSCP 32
+> actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
+> priority = FlowPriority.MONITORED_PACKET.value  # Higher priority for monitored packets
+> PacketUtils.add_flow(datapath, priority, match, actions)
+> ```
+
+# Other network topologies
+
+In addition to the first network configuration, two more network configurations have been implemented in this project. You can run them by passing the `--net` argument to the launcher script, where the possible values are `2` or `3`.
+
+# Network 2
+
+```sh
+./launcher.sh --net 2
+```
+
+The second network topology is a more complex one, where you can see more effectively how the packet behaves in the network and how the slices can be used to filter the traffic.
+
+![Network 2](images/net2.png)
+
+If you try to send an `UDP` packet from `h1` to `h3` (destination port is irrelevant, just put whatever), you will see something like this:
+
+![Sending a packet in network 2](images/send_packet_net2_udp.gif)
+
+The packet is sent from the switch `s1` to both `s2` and `s3` because it does not yet know the path to reach `h3`. These packets are in fact sent in `FLOODING` mode, which is of a lower priority then the `DEFAULT` rule assigned when the destination host is known. Of course then the switch `s2` discards the packet and only the switch `s3` correctly forwards the packet to `h3`.
+
+If you send the same packet again, you will see the same result, as the `UDP` packet is sent one-way, meaning that there is no response from `h3` to `h1`. However, if you send a `UDP` in an opposite direction, from `h3` to `h1`, you will see that the switch `s7` already knows the path to reach `h1` (due to the previous message that added a `DEFAULT` priority rule) and therefore it will forward the packet directly to `h3` without flooding it to `s8`. After this packet, also the original `h1` to `h3` UDB packet will be forwarded directly to `h3`, as the switch `s1` now knows the path to reach `h3`.
+
+# Custom terminal commands
+
 TODO
 
+# Package structure
 
-
-
-
-
-
+TODO (here or at the beginning of the file?)
 
 # General mininet and terminal commands
 

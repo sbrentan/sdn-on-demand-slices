@@ -181,7 +181,7 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
                 match = datapath.ofproto_parser.OFPMatch(**match_conditions)
                 if not SKIP_ADD_FLOW_ON_MONITORING or not is_monitored_packet:
                     PacketUtils.add_flow(datapath, FlowPriority.DEFAULT.value, match, actions)
-                elif is_monitored_packet:
+                if is_monitored_packet:
                     out_connection = [c for c in self.network.node_connections[switch_id] if c.is_host_connection and c.host_mac == dst]
                     if out_connection:
                         out_connection = out_connection[0]

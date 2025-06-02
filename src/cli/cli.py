@@ -125,6 +125,11 @@ class CustomCLI(CLI):
             return
         output("Network flows and queues reset successfully\n")
         return
+
+    def help_trace(self):
+        """Display help for the trace command."""
+        output("Custom command to trace a packet.\n")
+        output("Usage: trace -p PROTOCOL -port DST_PORT -src SRC -dst DST\n")
     
     def do_trace(self, line):
         """
