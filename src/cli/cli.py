@@ -251,7 +251,7 @@ def print_packet_trace(node, prefix="", is_last=True):
     # If there are no children, mark the end of this branch.
     children = node.get("children", [])
     if not children:
-        print(f"{prefix}{'   ' if is_last else '│  '} 🔴 Packet ends at {node['id']}")
+        print(f"{prefix}{'   ' if is_last else '│  '} [END] Packet ends at {node['id']}")
         return
 
     # Prepare a new prefix for children.

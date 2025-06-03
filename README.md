@@ -3,12 +3,35 @@ SDN On-demand dynamic slicing software using comnetsemu.
 
 This project is realized for the Networking 2 Master course of University of Trento and was developed through the combined effort of: [Simone Brentan](https://github.com/sbrentan), [Matteo Costalonga](https://github.com/wamuumu), [Alex Reichert](https://github.com/Faerye0)
 
+# Document index
+
+- [Project setup](#project-setup)
+    - [Comnetsemu installation](#comnetsemu-installation)
+    - [Project installation](#project-installation)
+    - [Launcher errors](#launcher-errors)
+- [Running the project](#running-the-project)
+- [Application GUI](#application-gui)
+    - [Details Menus](#details-menus)
+    - [Slice Rules](#slice-rules)
+    - [Editing a slice](#editing-a-slice)
+    - [Adding a new slice](#adding-a-new-slice)
+    - [Sending a packet](#sending-a-packet)
+    - [How does packet tracing works?](#how-does-packet-tracing-works)
+- [Other network topologies](#other-network-topologies)
+    - [Network 2](#network-2)
+- [Custom terminal commands](#custom-terminal-commands)
+- [Package structure](#package-structure)
+- [General mininet and terminal commands](#general-mininet-and-terminal-commands)
+    - [Mininet terminal](#mininet-terminal)
+    - [Mininet window commands](#mininet-window-commands)
+- [Useful references](#useful-references)
+
 
 # Project setup
 
 This section will go through the steps to set up the project on your local machine.
 
-To run this project locally, you need to have a simulation environment set up where to run Mininet and Ryu controller. As a simulation environment, we suggest using **ComnetSemu**.
+To run this project locally, you need to have a simulation environment set up where to run Mininet and Ryu controller. We used **ComnetSemu** as our network simulation environment.
 
 ComnetSemu is a virtual machine that runs on VirtualBox and provides a pre-configured environment for network simulations.
 
@@ -277,7 +300,177 @@ If you send the same packet again, you will see the same result, as the `UDP` pa
 
 # Custom terminal commands
 
-TODO
+If you run `help` in the Mininet terminal, you will see the list of available commands:
+```sh
+mininet> help
+
+Documented commands (type help <topic>):
+========================================
+EOF     exit   iperf     net      pingallfull   px     sh      trace
+bwtest  gterm  iperfudp  nodes    pingpair      py     source  wait
+dpctl   help   link      noecho   pingpairfull  quit   switch  x
+dump    intfs  links     pingall  ports         reset  time    xterm
+```
+
+Most of these commands are provided by `Mininet` itself, but some of them are custom commands that we added to the project. In particular, the following commands are available:
+* `reset`: This command makes the Ryu controller reset the network and clear all the flows and queues in the switches. This is useful to start from a clean state and avoid issues when adding new slices or rules.
+* `trace`: This command allows you to trace a packet in the network. It will send a packet from the specified source host to the specified destination host and monitor its traffic. The packet will be sent with the DSCP tag set to `32`, so it will be redirected to the Ryu controller for monitoring events.
+> This command is equivalent to the `Send Packet` button in the web interface, but it can be used from the Mininet terminal instead.
+* `bwtest`: This command allows you to test the bandwidth between two hosts in the network. It will send a packet from the specified source host to the specified destination host and measure the bandwidth used by the packet. It is equivalent to the `iperf` command but it is more convenient to use.
+
+## Trace command
+
+This command can be used to trace a packet in the network and test the forwarding rules applied to the slices. 
+
+If you run the help command, you will see the following output:
+```sh
+mininet> help trace
+Custom command to trace a packet.
+Usage: trace -p PROTOCOL -port DST_PORT -src SRC -dst DST
+```
+
+Where:
+* `-p PROTOCOL`: The protocol to use for the packet (TCP, UDP, ICMP).
+* `-port DST_PORT`: The destination port for the packet. This is required for TCP and UDP packets.
+* `-src SRC`: The source host from which the packet will be sent. Mininet host names have to be used, such as `h1`, `h2`, etc.
+* `-dst DST`: The destination host to which the packet will be sent. As for the source host, Mininet host names have to be used.
+
+For example, if you use the first network configuration and you want to trace a TCP packet from `h1` to `h3` (as done previously in the `Sending a packet` [section](#sending-a-packet)), you can run the trace command and you will see the following output:
+```sh
+mininet> trace -p TCP -port 9999 -src h1 -dst h3
+Sending packet from h1 to 10.0.0.3 with protocol TCP and port 9999
+Host MAC address: 00:00:00:00:00:01
+Sending a single TCP packet from 10.0.0.1:None to 10.0.0.3:9999
+- Connection refused by the server
+ → 00:00:00:00:00:01
+   └─ → s1
+      └─ → s3
+         └─ → s4
+            └─ → 00:00:00:00:00:03
+               └─ → s4
+                  └─ → s3
+                     └─ → s1
+                        └─ → 00:00:00:00:00:01
+                            [END] Packet ends at 00:00:00:00:00:01
+```
+
+This output shows the path taken by the packet in the network, with the MAC addresses of the hosts and switches involved in the forwarding process. The `Connection refused by the server` message indicates that the destination host is not listening on the specified port, which is expected in this case as we are just tracing a packet without a server running on `h3`.
+
+This output format (with the arrows and indentation) becomes useful when the network topology is more complex and packets are flooed in multiple directions. For example, if you send a UDP packet from `h1` to `h3` in the second network configuration (as shown in the [Network 2](#network-2) section), you will see something like this:
+```sh
+mininet> trace -p UDP -port 9999 -src h1 -dst h3
+Sending packet from h1 to 10.0.0.3 with protocol UDP and port 9999
+Host MAC address: 00:00:00:00:00:01
+Sending a single UDP packet from 10.0.0.1:None to 10.0.0.3:9999
+ → 00:00:00:00:00:01
+   └─ → s1
+      ├─ → s2
+      │   [END] Packet ends at s2
+      └─ → s3
+         └─ → s5
+            └─ → s7
+               └─ → 00:00:00:00:00:03
+                   [END] Packet ends at 00:00:00:00:00:03
+```
+
+The output shows that the is flooded from `s1` to both `s2` and `s3`, but only the path through `s3` reaches the destination host `h3`. The path through `s2` is discarded, as expected.
+
+Even if this is but a simple example, it shows the power of the `trace` command to visualize the packet forwarding process in the network.
+
+## Bandwidth test command
+
+The `bwtest` command can be used to test the bandwidth between two hosts in the network.
+
+It has been implemented in order to make it more simple to test the bandwidth between two hosts, without having to manually run the `iperf` command in the Mininet terminal.
+
+If you run the help command, you will see the following output:
+```sh
+mininet> help bwtest
+Custom command to perform bandwidth tests.
+Usage: bwtest [-h] [-p PROTOCOL] [-port DST_PORT] [-src SRC] [-dst DST]
+```
+
+Where:
+* `-p PROTOCOL`: The protocol to use for the bandwidth test (TCP, UDP).
+* `-port DST_PORT`: The destination port for the bandwidth test. This is required for TCP and UDP packets.
+* `-src SRC`: The source host from which the bandwidth test will be performed. Mininet host names have to be used, such as `h1`, `h2`, etc.
+* `-dst DST`: The destination host to which the bandwidth test will be performed. As for the source host, Mininet host names have to be used.
+
+For example, let's say you want to test the `UDP` bandwidth between `h1` and `h3` in the first network configuration.
+
+
+> **NOTE**: It is suggested to run the `bwtest` command only after the flow rules for the slice have been set up.
+>
+> To do this, you can simply trace the packet first:
+> ```sh
+> mininet> trace -p UDP -port 9999 -src h1 -dst h3
+> ```
+
+After that, you can run the `bwtest` command as follows:
+
+```sh
+mininet> bwtest -p UDP -port 9999 -src h1 -dst h3
+Performing bandwidth test...
+
+------------------------------------------------------------
+Server listening on UDP port 9999
+Receiving 1470 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.3 port 9999 connected with 10.0.0.1 port 51381
+[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
+[  3]  0.0-10.1 sec  9.77 MBytes  8.12 Mbits/sec   7.143 ms    0/ 6971 (0%)
+
+Bandwidth test result:
+------------------------------------------------------------
+Client connecting to 10.0.0.3, UDP port 9999
+Sending 1470 byte datagrams, IPG target: 11.22 us (kalman adjust)
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.1 port 51381 connected with 10.0.0.3 port 9999
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0- 1.0 sec  1.13 MBytes  9.44 Mbits/sec
+[  3]  1.0- 2.0 sec  1.05 MBytes  8.84 Mbits/sec
+[  3]  2.0- 3.0 sec  1.06 MBytes  8.87 Mbits/sec
+[  3]  3.0- 4.0 sec  1.06 MBytes  8.86 Mbits/sec
+[  3]  4.0- 5.0 sec  1012 KBytes  8.29 Mbits/sec
+[  3]  5.0- 6.0 sec   811 KBytes  6.64 Mbits/sec
+[  3]  6.0- 7.0 sec   883 KBytes  7.23 Mbits/sec
+[  3]  7.0- 8.0 sec   946 KBytes  7.75 Mbits/sec
+[  3]  8.0- 9.0 sec  1.05 MBytes  8.84 Mbits/sec
+[  3]  0.0-10.0 sec  9.77 MBytes  8.20 Mbits/sec
+[  3] Sent 6971 datagrams
+[  3] Server Report:
+[  3]  0.0-10.1 sec  9.77 MBytes  8.12 Mbits/sec   7.143 ms    0/ 6971 (0%)
+```
+
+> **NOTE 1**: After running the `bwtest` command, the result is printed in the console only when the test is completed (15/20 seconds). This is because the command runs the `iperf` command in the background and waits for it to finish before printing the result. If the console gets stuck, a simple `Ctrl + C` should be enough to unfreeze it and print the result.
+
+> **NOTE 2**: If you run the `bwtest` command without first tracing a packet, you will probably get a weird bandwidth result such as:
+> ```sh
+> Bandwidth test result:
+> ------------------------------------------------------------
+> Client connecting to 10.0.0.3, UDP port 9999
+> Sending 1470 byte datagrams, IPG target: 11.22 us (kalman adjust)
+> UDP buffer size:  208 KByte (default)
+> ------------------------------------------------------------
+> [  3] local 10.0.0.1 port 46900 connected with 10.0.0.3 port 9999
+> [ ID] Interval       Transfer     Bandwidth
+> [  3]  0.0- 1.0 sec  17.2 MBytes   145 Mbits/sec
+> [  3]  1.0- 2.0 sec   953 KBytes  7.81 Mbits/sec
+> [  3]  2.0- 3.0 sec   810 KBytes  6.63 Mbits/sec
+> [  3]  3.0- 4.0 sec   811 KBytes  6.64 Mbits/sec
+> [  3]  4.0- 5.0 sec   877 KBytes  7.19 Mbits/sec
+> [  3]  5.0- 6.0 sec   879 KBytes  7.20 Mbits/sec
+> [  3]  6.0- 7.0 sec   811 KBytes  6.64 Mbits/sec
+> [  3]  7.0- 8.0 sec   880 KBytes  7.21 Mbits/sec
+> [  3]  8.0- 9.0 sec   877 KBytes  7.19 Mbits/sec
+> [  3] WARNING: did not receive ack of last datagram after 10 tries.
+> [  3]  0.0-10.0 sec  24.8 MBytes  20.8 Mbits/sec
+> [  3] Sent 17661 datagrams
+> ```
+> In particular, the first line shows a very high bandwidth value (`145 Mbits/sec`) because the `iperf` command sends a large amount of data while the first switch has yet to receive instructions from the Ryu controller.
+
 
 # Package structure
 
@@ -369,6 +562,8 @@ h3 iperf -s -u -p 9999 -b 10M -t 30 & (start listening on h3 as server in backgr
 h1 iperf -c 10.0.0.3 -u -p 9999 -b 10M -t 10 -i 1 (start sending on h1 as a client, 10 times with interval 1s)
 ```
 
-# Documentations
+# Useful references
 
 * [Ryu python documentation](https://ryu.readthedocs.io/en/latest/)
+* [Comnetsemu github repository](https://github.com/stevelorenz/comnetsemu)
+* [Mininet documentation](http://mininet.org/walkthrough/)
