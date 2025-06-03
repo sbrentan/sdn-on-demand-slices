@@ -444,6 +444,12 @@ UDP buffer size:  208 KByte (default)
 [  3]  0.0-10.1 sec  9.77 MBytes  8.12 Mbits/sec   7.143 ms    0/ 6971 (0%)
 ```
 
+In this example, it can be seen how the bandwidth achieved for the `UDP` packet is around `8-9 Mbits/sec`, which is the expected value for this network configuration (set to `9 Mbits/sec`).
+
+For comparison, if you run the same command but with the `TCP` protocol, you should get a bandwidth of around `1 Mbits/sec`.
+
+### Notes on `bwtest` command
+
 > **NOTE 1**: After running the `bwtest` command, the result is printed in the console only when the test is completed (15/20 seconds). This is because the command runs the `iperf` command in the background and waits for it to finish before printing the result. If the console gets stuck, a simple `Ctrl + C` should be enough to unfreeze it and print the result.
 
 > **NOTE 2**: If you run the `bwtest` command without first tracing a packet, you will probably get a weird bandwidth result such as:
@@ -474,7 +480,41 @@ UDP buffer size:  208 KByte (default)
 
 # Package structure
 
-TODO (here or at the beginning of the file?)
+The project is structured as follows:
+
+```
+sdn-on-demand-slices/
+├── cli/                     # Custom cli and commands
+│   └── ...
+├── common/                  # Common classes and enums used across the project
+│   └── ...
+├── controllers/             # Controllers to handle both gui and api requests
+│   ├── api.py
+│   └── gui.py
+├── events/
+│   ├── topology.py          # Event handler for topology changes
+├── examples/                # Folder containing the demo network configurations
+│   ├── ...
+├── gui/                     # Web interface (frontend) files
+│   └── ...
+├── logs/                    # Log files created by the application
+│   └── ...
+├── managers/
+│   ├── monitoring.py        # Manager for monitoring `traced packets`
+│   ├── network.py           # Manager that initializes node connections
+│   ├── slices.py            # Manager for handling slices operations
+├── utils/                   # Utility classes and functions
+│   └── ...
+├── network.py               # Mininet executable that creates the network
+├── ryu_app.py               # Ryu main application file
+├── launcher.sh              # Main script to launch the application
+├── requirements.txt         # Python dependencies
+└── README.md                # Project documentation
+```
+
+# Forwarding strategy
+
+TODO
 
 # General mininet and terminal commands
 
