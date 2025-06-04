@@ -1,7 +1,9 @@
 # sdn-on-demand-slices
 SDN On-demand dynamic slicing software using comnetsemu.
 
-This project is realized for the Networking 2 Master course of University of Trento and was developed through the combined effort of: [Simone Brentan](https://github.com/sbrentan), [Matteo Costalonga](https://github.com/wamuumu), [Alex Reichert](https://github.com/Faerye0)
+This project is realized for the Networking 2 Master course of University of Trento and was developed through the combined effort of: [Simone Brentan](https://github.com/sbrentan), [Matteo Costalonga](https://github.com/wamuumu) and [Alex Reichert](https://github.com/Faerye0)
+
+A detailed documentation regarding the packet forwarding strategy adopted can be found in the [Forwarding strategy](#forwarding-strategy) section.
 
 # Document index
 
@@ -21,10 +23,10 @@ This project is realized for the Networking 2 Master course of University of Tre
     - [Network 2](#network-2)
 - [Custom terminal commands](#custom-terminal-commands)
 - [Package structure](#package-structure)
-- [General mininet and terminal commands](#general-mininet-and-terminal-commands)
-    - [Mininet terminal](#mininet-terminal)
-    - [Mininet window commands](#mininet-window-commands)
-- [Useful references](#useful-references)
+- [Forwarding strategy](#forwarding-strategy)
+- [Appendix](#appendix)
+    - [Useful references](#useful-references)
+    - [General mininet and terminal commands](#general-mininet-and-terminal-commands)
 
 
 # Project setup
@@ -514,9 +516,74 @@ sdn-on-demand-slices/
 
 # Forwarding strategy
 
-TODO
+Ryu controller is the one responsible for managing the network and handling the OpenFlow messages. 
 
-# General mininet and terminal commands
+At the beginning of the application, the Ryu controller waits for the switches connection and then sets up the default OpenFlow rules and queues for each switch:
+1. It sets a default rule to redirect all unmatched packets to the controller, so that it can handle them and decide how to forward them.
+2. It sets a rule to match the DSCP tag `32` (which is used to track the monitored packets) and redirect them to the controller with a higher priority than the default rule.
+3. For each connected switch, it sets the `ovsdb address` to the controller.
+4. If slices were defined in the network configuration, it already creates the list of `QoS queues` for each switch based on the slices defined.
+
+When a packet is forwarded from a switch and reaches the controller, it is processed by the `_in_packet_handler` method.
+
+In general, the forwarding strategy is based on the definition of a dictionary called `mac_to_port`. It is a three layered dictionary that maps, for each switch, for each slice, where to redirect a packet based on its destination MAC address.
+
+> self.mac_to_port[switch_id][slice_name][mac] = (port, queue.queue_id)
+
+This dictionary is populated when a packet is received by a switch and therefore we know were to redirect incoming packets to that source host.
+
+If a match is found in this dictionary, then the packet is forwarded to the corresponding port and queue, otherwise:
+1. The incoming packet is checked for slices which can be applied to the packet. If no slice is found, the packet is dropped (and a rule is added in `DROP` priority)
+2. If among the outgoing ports there is a connection to the correct destination host, the packet is forwarded to that port and queue in `DEFAULT` priority.
+3. If one or more slices are found, the outgoing ports are determined based on the slice rules. Only links to switches that are part of the slice are considered for forwarding the packet. The priority used for this new OpenFlow rules is `FLOODING`, which is of a lower priority than the `DEFAULT` rule.
+
+> **Note**: Matches used to determine the OpenFlow rules are based on the type of forwarding applied
+> * When forwarding in `DEFAULT` mode, the matching strategy applied is more permissive and is based on the slice rules.
+> * When forwarding in `FLOODING` mode, the matching strategy is more restrictive and is made to match strictly the incoming packet.
+> * When dropping a packet, similarly to the `FLOODING` mode, the rule is made so that only the incoming packet is matched and dropped.
+> 
+> The implementation of this matching strategy can be found in the `ryu_app.py` file in the methods `DynamicSlicingController._get_match_conditions_for_packet` and `DynamicSlicingController._get_match_conditions_for_slice`.
+
+## Topology definition and storage
+
+After the switches and hosts are connected at application startup, a function is called to save the network topology inside a custom class `Network`, which is located in the `common/network.py` file.
+```
+class Network:
+    switches: Dict[str, Switch]
+    links: Dict[str, Link]
+    hosts: Dict[str, Host]
+    nodes: Dict[str, Node]
+    connections: List[Connection]
+
+    update_events: List[Callable] = []
+
+    slices: List[Slice] = []
+    node_connections: Dict[str, List[Connection]] = {}
+    link_to_slice_dict: Dict[str, List[Slice]] = {}
+    ...
+```
+
+In particular, this class contains:
+* A list of `Switch`, `Host` and `Link` objects, which are used to represent the network topology.
+* A list of `Nodes` objects, which are wrapper classes to manage both `Switch` and `Host` objects in a unified way.
+* A list of `Connection` objects, defining a link between two nodes in the network.
+* A list of `Slice` objects, which are used to represent the slices in the network.
+* A `node_connections` dictionary, which maps each node to a list of connections that are connected to it.
+* A `link_to_slice_dict` dictionary, which maps each link to a list of slices that are using that link.
+
+These last two dictionaries are very important to efficiently manage the forwarding of packets in the network.
+
+> **Note**: The `Network` class is a `singleton` class, meaning that there is only one instance of it in the application. This is done to avoid having multiple instances of the network topology and to ensure that all the components of the application are using the same network topology.
+
+# Appendix
+
+## Useful references
+
+* [Ryu python documentation](https://ryu.readthedocs.io/en/latest/)
+* [Comnetsemu github repository](https://github.com/stevelorenz/comnetsemu)
+* [Mininet documentation](http://mininet.org/walkthrough/)
+
+## General mininet and terminal commands
 
 
 Listen on switch `s0` on port `6653` and prints output in `test.pcap`
@@ -601,9 +668,3 @@ h1 (client) performs bandwitdh test on h3 (server). The controller service_slici
 h3 iperf -s -u -p 9999 -b 10M -t 30 & (start listening on h3 as server in background for around 30s)
 h1 iperf -c 10.0.0.3 -u -p 9999 -b 10M -t 10 -i 1 (start sending on h1 as a client, 10 times with interval 1s)
 ```
-
-# Useful references
-
-* [Ryu python documentation](https://ryu.readthedocs.io/en/latest/)
-* [Comnetsemu github repository](https://github.com/stevelorenz/comnetsemu)
-* [Mininet documentation](http://mininet.org/walkthrough/)
