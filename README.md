@@ -18,7 +18,7 @@ A detailed documentation regarding the packet forwarding strategy adopted can be
     - [Editing a slice](#editing-a-slice)
     - [Adding a new slice](#adding-a-new-slice)
     - [Sending a packet](#sending-a-packet)
-    - [How does packet tracing works?](#how-does-packet-tracing-works)
+    - [How does packet tracing work?](#how-does-packet-tracing-works)
 - [Other network topologies](#other-network-topologies)
     - [Network 2](#network-2)
 - [Custom terminal commands](#custom-terminal-commands)
@@ -26,7 +26,7 @@ A detailed documentation regarding the packet forwarding strategy adopted can be
 - [Forwarding strategy](#forwarding-strategy)
 - [Appendix](#appendix)
     - [Useful references](#useful-references)
-    - [General mininet and terminal commands](#general-mininet-and-terminal-commands)
+    - [General Mininet and terminal commands](#general-mininet-and-terminal-commands)
 
 
 # Project setup
@@ -39,26 +39,26 @@ ComnetSemu is a virtual machine that runs on VirtualBox and provides a pre-confi
 
 ## Comnetsemu installation
 
-This project installation and setup has been tested only within a `Windows` environment.
+This project installation and setup has been tested within `Windows` and `MacOS Intel` environments.
 
 Before starting, make sure you have VirtualBox and Vagrant installed on your machine.
-* You can download **Virtualbox** from its offcial [website](https://www.virtualbox.org/).
+* You can download **VirtualBox** from its official [website](https://www.virtualbox.org/).
 * You can download **Vagrant** from its official [website](https://www.vagrantup.com/).
 
-To run the virtual machine with ComnetSemu, you can go to this [github repository](https://github.com/stevelorenz/comnetsemu) and clone it to your local machine.
+To run the virtual machine with ComnetSemu, you can go to this [GitHub repository](https://github.com/stevelorenz/comnetsemu) and clone it to your local machine.
 ```sh
 git clone https://github.com/stevelorenz/comnetsemu
 ```
 
 After cloning the repository, you need to setup and build the virtual machine with Vagrant.
 
-Open the Vagrantfile in the cloned repository and add this following line in the correct section.
+Open the Vagrantfile in the cloned repository and add the following line in the correct section.
 ```vagrantfile
 comnetsemu.vm.network "forwarded_port", guest: 8080, host: 8080
 ```
 This is used to forward the port 8080 to the host machine and make the web interface of ComnetSemu accessible from your browser.
 
-Additionally, we suggest to add this line in the Vagrantfile to increase the boot timeout, as the virtual machine takes a while to boot up:
+Additionally, we suggest adding this line in the Vagrantfile to increase the boot timeout, as the virtual machine takes a while to boot up:
 ```vagrantfile
 config.vm.boot_timeout = 3600
 ```
@@ -90,7 +90,7 @@ Now you can clone this repository inside the `app` folder:
 git clone https://github.com/sbrentan/sdn-on-demand-slices.git
 ```
 
-Install mininet and the openvswitch package for `superuser`:
+Install Mininet and the Open vSwitch package for `superuser`:
 ```sh
 sudo apt update
 sudo apt install openvswitch-switch
@@ -159,7 +159,8 @@ After starting the application, what basically happens is the following:
 * Mininet is started and the network is created with the specified configuration, which creates the virtual hosts and switches.
 * The controller waits for all nodes to be correctly set up and available, which may take a few seconds. To do this, it tries to ping all hosts in the network until they are reachable.
     * This takes a while because the network becomes available only after all the nodes/switches are connected and the Ryu controller handled the creation of the queues and flows.
-* A thread is started from within the Mininet executable (`Polling APIs for packets requests...`) that polls the Ryu controller for packets requests. This is used for sending custom packets to the network and to monitor the traffic.
+    * If the host machine is slow, 5 attempts may not be enough to properly make the network available. To fix this, open `cli.py` under `cli` folder, and manually adjust the `ATTEMPTS` constant at the beginning of the file. 
+* A thread is started from within the Mininet executable (`Polling APIs for packets requests...`) that polls the Ryu controller for packet requests. This is used for sending custom packets to the network and to monitor the traffic.
 
 When closing the application, you can do it by pressing `Ctrl + D` in the terminal or by typing `exit` in the Mininet console. This will stop the Mininet network and the Ryu controller, and exit the application. Additionally, it will run the `mn -c` command to clear the Mininet state, which is useful to avoid issues when restarting the application.
 
@@ -190,9 +191,9 @@ The possible details menus are:
 
 In the `Host` and `Switch` details menus, you can edit the name of the element, which is useful to identify it in the network topology. You can also see the Datapath ID for the switch and the IP/MAC address for the host.
 
-In the `Link` details menu, you can see the name of the two nodes connected as well as the list of slices that are using that link. This is useful to understand which slices are sharing the same link and which bandwidth they are using.
+In the `Link` details menu, you can see the names of the two nodes connected as well as the list of slices that are using that link. This is useful to understand which slices are sharing the same link and which bandwidth they are using.
 
-In the `Slice` details menu, you can see the name of the slice and the minumum/maximum bandwidth that the slice can use (expressed in `bits/sec`). You can also see a list of **RULES** that are applied to the slice, which are used to filter the traffic and apply the bandwidth limits. The rules are explained in more detail in the next section. In this menu, in addition to the `Edit` button, there is also a `Delete` button that allows you to delete the slice and a `Enable/Disable` button that allows you to enable or disable the slice. When a slice is disabled, it will not be able to send or receive traffic, but it will still be present in the network and can be enabled again later.
+In the `Slice` details menu, you can see the name of the slice and the minimum/maximum bandwidth that the slice can use (expressed in `bits/sec`). You can also see a list of **RULES** that are applied to the slice, which are used to filter the traffic and apply the bandwidth limits. The rules are explained in more detail in the next section. In this menu, in addition to the `Edit` button, there is also a `Delete` button that allows you to delete the slice and a `Enable/Disable` button that allows you to enable or disable the slice. When a slice is disabled, it will not be able to send or receive traffic, but it will still be present in the network and can be enabled again later.
 
 ## Slice Rules
 
@@ -200,7 +201,7 @@ The slice rules are used to filter the traffic and define which packets are allo
 
 * **PROTOCOL**: This rule allows you to filter the traffic based on the protocol used in the packet. You can select from a list of protocols (TCP, UDP, ICMP).
 * **PORT**: This rule allows you to filter the traffic based on the port used in the packet.
-* **SERVICE**: This rule allows you to filter the traffic based on the service the packet needs to reach. As shown in the above image, a service is defined by a combination of ip address and a list of ports. This is useful to define a specific service that the slice can access, such as a web server or a database.
+* **SERVICE**: This rule allows you to filter the traffic based on the service the packet needs to reach. As shown in the above image, a service is defined by a combination of an IP  address and a list of ports. This is useful to define a specific service that the slice can access, such as a web server or a database.
 
 > **SERVICES** have been introduced as a different mechanism to allow packets to pass. In particular, this type of rule only needs either the sender or the receiver to match the service, while the other host is not checked.
 
@@ -248,15 +249,15 @@ When clicking the `Send` button, the packet will be sent in the network and the 
 ### UDP Packet
 ![Sending a packet](images/send_packet_net1_udp.gif)
 
-## How does packet tracing works?
+## How does packet tracing work?
 
 In order to have the Ryu application correctly monitor a packet, a specific mechnism has been implemented.
 
 In general, what happens is:
 
-1. The web interface sends a request to the Ryu controller APId to send a packet with the specified parameters.
+1. The web interface sends a request to the Ryu controller APIs to send a packet with the specified parameters.
 2. The Ryu controller receives the request and stores this new packet.
-3. The thread that has been spawned by the `Mininet` executable (the one that printed `Polling APIs for packets requests...` at application startup) polls the Ryu controller API for new packets requests every second.
+3. The thread that has been spawned by the `Mininet` executable (the one that printed `Polling APIs for packets requests...` at application startup) polls the Ryu controller API for new packet requests every second.
 4. When a new packet request is found, the polling thread sends the packet in the network using the `send_packet.py` script, which is located in the `commands` folder of the project. This script is executed in the Mininet environment inside the source host, which is the host that will send the packet.
 5. The `send_packet.py` script builds the packet with the specified parameters and sends it in the network using the python `socket` library. Additionally, a special tag is set to track the packet (more details on this in the following note).
 6. The Ryu controller receives and recognizes the packet as a monitored packet, and progressively stores the packet's position in the network at each step.
@@ -298,7 +299,7 @@ If you try to send an `UDP` packet from `h1` to `h3` (destination port is irrele
 
 The packet is sent from the switch `s1` to both `s2` and `s3` because it does not yet know the path to reach `h3`. These packets are in fact sent in `FLOODING` mode, which is of a lower priority then the `DEFAULT` rule assigned when the destination host is known. Of course then the switch `s2` discards the packet and only the switch `s3` correctly forwards the packet to `h3`.
 
-If you send the same packet again, you will see the same result, as the `UDP` packet is sent one-way, meaning that there is no response from `h3` to `h1`. However, if you send a `UDP` in an opposite direction, from `h3` to `h1`, you will see that the switch `s7` already knows the path to reach `h1` (due to the previous message that added a `DEFAULT` priority rule) and therefore it will forward the packet directly to `h3` without flooding it to `s8`. After this packet, also the original `h1` to `h3` UDB packet will be forwarded directly to `h3`, as the switch `s1` now knows the path to reach `h3`.
+If you send the same packet again, you will see the same result, as the `UDP` packet is sent one-way, meaning that there is no response from `h3` to `h1`. However, if you send a `UDP` in an opposite direction, from `h3` to `h1`, you will see that the switch `s7` already knows the path to reach `h1` (due to the previous message that added a `DEFAULT` priority rule) and therefore it will forward the packet directly to `h3` without flooding it to `s8`. After this packet, also the original `h1` to `h3` UDP packet will be forwarded directly to `h3`, as the switch `s1` now knows the path to reach `h3`.
 
 # Custom terminal commands
 
@@ -358,7 +359,7 @@ Sending a single TCP packet from 10.0.0.1:None to 10.0.0.3:9999
 
 This output shows the path taken by the packet in the network, with the MAC addresses of the hosts and switches involved in the forwarding process. The `Connection refused by the server` message indicates that the destination host is not listening on the specified port, which is expected in this case as we are just tracing a packet without a server running on `h3`.
 
-This output format (with the arrows and indentation) becomes useful when the network topology is more complex and packets are flooed in multiple directions. For example, if you send a UDP packet from `h1` to `h3` in the second network configuration (as shown in the [Network 2](#network-2) section), you will see something like this:
+This output format (with the arrows and indentation) becomes useful when the network topology is more complex and packets are flooded in multiple directions. For example, if you send a UDP packet from `h1` to `h3` in the second network configuration (as shown in the [Network 2](#network-2) section), you will see something like this:
 ```sh
 mininet> trace -p UDP -port 9999 -src h1 -dst h3
 Sending packet from h1 to 10.0.0.3 with protocol UDP and port 9999
@@ -530,12 +531,12 @@ In general, the forwarding strategy is based on the definition of a dictionary c
 
 > self.mac_to_port[switch_id][slice_name][mac] = (port, queue.queue_id)
 
-This dictionary is populated when a packet is received by a switch and therefore we know were to redirect incoming packets to that source host.
+This dictionary is populated when a packet is received by a switch and therefore we know where to redirect incoming packets to that source host.
 
 If a match is found in this dictionary, then the packet is forwarded to the corresponding port and queue, otherwise:
 1. The incoming packet is checked for slices which can be applied to the packet. If no slice is found, the packet is dropped (and a rule is added in `DROP` priority)
-2. If among the outgoing ports there is a connection to the correct destination host, the packet is forwarded to that port and queue in `DEFAULT` priority.
-3. If one or more slices are found, the outgoing ports are determined based on the slice rules. Only links to switches that are part of the slice are considered for forwarding the packet. The priority used for this new OpenFlow rules is `FLOODING`, which is of a lower priority than the `DEFAULT` rule.
+2. If among the outgoing ports there is a connection to the correct destination host, the packet is forwarded to that port and queued in `DEFAULT` priority.
+3. If one or more slices are found, the outgoing ports are determined based on the slice rules. Only links to switches that are part of the slice are considered for forwarding the packet. The priority used for this new OpenFlow rule is `FLOODING`, which is of a lower priority than the `DEFAULT` rule.
 
 > **Note**: Matches used to determine the OpenFlow rules are based on the type of forwarding applied
 > * When forwarding in `DEFAULT` mode, the matching strategy applied is more permissive and is based on the slice rules.
@@ -580,10 +581,10 @@ These last two dictionaries are very important to efficiently manage the forward
 ## Useful references
 
 * [Ryu python documentation](https://ryu.readthedocs.io/en/latest/)
-* [Comnetsemu github repository](https://github.com/stevelorenz/comnetsemu)
+* [Comnetsemu GitHub repository](https://github.com/stevelorenz/comnetsemu)
 * [Mininet documentation](http://mininet.org/walkthrough/)
 
-## General mininet and terminal commands
+## General Mininet and terminal commands
 
 
 Listen on switch `s0` on port `6653` and prints output in `test.pcap`
@@ -634,9 +635,9 @@ sudo mn --topo single,3 --mac --switch ovsk --controller remote
 * Set the MAC address of each host equal to its IP.
 * Configure the OpenFlow switch to connect to a remote controller.
 
-To fix when mininet is not working correctly, first kill mininet and then clear state with:
+To fix when Mininet is not working correctly, first kill Mininet and then clear state with:
 ```sh
-quit (to close mininet window)
+quit (to close Mininet window)
 sudo mn -c (to clear the state)
 ```
 
@@ -653,9 +654,9 @@ xterm h1 h2 (to open host-specific terminal windows)
 h1 python3 commands/send_packet.py -ip 10.0.0.3 -t udp -p 9999
 ```
 
-To run a command in background from a specific host (e.g. h3 iperf) inside mininet window:
+To run a command in background from a specific host (e.g. h3 iperf) inside Mininet window:
 
-h1 (client) performs bandwitdh test on h3 (server). The controller service_slicing.py is configured to allow the UDP port 9999 to have a max bandwidth of 10 Mbps. If the port change (e.g. if we put 9998), the max bandwidth drops to 1 Mbps. The following command specify:
+h1 (client) performs a bandwitdh test on h3 (server). The controller service_slicing.py is configured to allow the UDP port 9999 to have a max bandwidth of 10 Mbps. If the port change (e.g. if we put 9998), the max bandwidth drops to 1 Mbps. The following command specify:
 
 * -s / -c: set respectively the server or client mode
 * -u: change the protocol from TCP to UDP
