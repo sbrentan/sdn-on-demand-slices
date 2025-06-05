@@ -13,6 +13,7 @@ from cli.bandwidth_tests import BandwidthTest
 
 stopping_flag = threading.Event()
 
+ATTEMPTS = 5
 
 class CustomCLI(CLI):
 
@@ -41,12 +42,12 @@ class CustomCLI(CLI):
         output("\nWaiting for all nodes to be correctly set up and available...\n")
         i = 0
         ready = False
-        while i < 5:
+        while i < ATTEMPTS:
             if i:
                 # Move the cursor up and clear the line
                 output("\033[A")  # Move cursor up
                 output("\033[K")  # Clear line
-            output(f"Attempt {i + 1}/5...\n")
+            output(f"Attempt {i + 1}/{ATTEMPTS}...\n")
 
             # Avoid printing output in the console
             setLogLevel("critical")
