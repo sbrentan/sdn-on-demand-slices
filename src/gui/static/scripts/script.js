@@ -489,14 +489,14 @@ function toggleNodeSelectionForNewSlice(nodeSelection, nodeData) {
         newSliceNodes.push(nodeId);
     }
     
-    // For visual feedback: compute the links connecting the currently selected nodes
+    // Compute the links connecting the currently selected nodes
     const computedLinks = graph_data.links.filter(link => {
         const sourceId = (typeof link.source === "object") ? link.source.id : link.source;
         const targetId = (typeof link.target === "object") ? link.target.id : link.target;
         return newSliceNodes.includes(sourceId) && newSliceNodes.includes(targetId) && !skipped_links.includes(link.id);
     }).map(link => link.id);
     
-    // Use your existing highlightSlice to highlight the selected nodes and their interconnecting links
+    // Highlight the selected nodes and their interconnecting links
     const tempSlice = { nodes: newSliceNodes, links: computedLinks };
     highlightSlice(null, tempSlice);
 }

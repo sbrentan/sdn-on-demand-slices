@@ -160,6 +160,10 @@ After starting the application, what basically happens is the following:
 * The controller waits for all nodes to be correctly set up and available, which may take a few seconds. To do this, it tries to ping all hosts in the network until they are reachable.
     * This takes a while because the network becomes available only after all the nodes/switches are connected and the Ryu controller handled the creation of the queues and flows.
     * If the host machine is slow, 5 attempts may not be enough to properly make the network available. To fix this, open `cli.py` under `cli` folder, and manually adjust the `ATTEMPTS` constant at the beginning of the file. 
+
+        > **NOTE**: Even if all attempts fail (and you get the message: `Some nodes are not ready. Please check the network setup`) the application should still work. Each attempt basically consist of a pingall command, and it may simply mean that some hosts do not ping each other. This could be:
+        >   - temporary -> because the system is slow and it takes a while to configure the queues. In this case just wait a few seconds and try to run `pingall`.
+        >   - intentional -> depending on the network configuration you are using some hosts do not interconnect through a ICMP slice.
 * A thread is started from within the Mininet executable (`Polling APIs for packets requests...`) that polls the Ryu controller for packet requests. This is used for sending custom packets to the network and to monitor the traffic.
 
 When closing the application, you can do it by pressing `Ctrl + D` in the terminal or by typing `exit` in the Mininet console. This will stop the Mininet network and the Ryu controller, and exit the application. Additionally, it will run the `mn -c` command to clear the Mininet state, which is useful to avoid issues when restarting the application.

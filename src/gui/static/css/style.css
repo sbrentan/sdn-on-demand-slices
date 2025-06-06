@@ -258,12 +258,10 @@ button.cancel-btn::after{
 }
 
 
-/* Adjust width of IP input fields */
 .ip-segment {
     width: 80px;
     display: inline-block;
 }
-/* Style for port pills and inline port input */
 .port-pill {
     margin: 2px;
 }

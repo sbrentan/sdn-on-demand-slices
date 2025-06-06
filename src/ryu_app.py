@@ -130,7 +130,6 @@ class DynamicSlicingController(app_manager.RyuApp, TopologyEventHandler):
             logging.info("Received IPv4 packet with DSCP value %d", dscp_value)
 
             is_monitored_packet = dscp_value == 32  # Filter DSCP-tagged packets
-            # later, when registering packets for monitoring `add_flow` is not called
 
         if eth.ethertype != ether_types.ETH_TYPE_IP: # type: ignore
             return

@@ -241,7 +241,6 @@ def print_packet_trace(node, prefix="", is_last=True):
     :param prefix: String used for indentation.
     :param is_last: Boolean flag indicating if this node is the last among siblings.
     """
-    # Choose a branch symbol: if this is the root, no symbol is needed.
     branch = ""
     if prefix:
         branch = "└─" if is_last else "├─"

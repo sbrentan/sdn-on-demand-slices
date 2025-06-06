@@ -41,7 +41,6 @@ def checksum(source_string):
     max_count = (len(source_string) // 2) * 2
     count = 0
     while count < max_count:
-        # ord() is not needed for bytes in Python 3.
         val = source_string[count + 1] * 256 + source_string[count]
         sum = sum + val
         sum = sum & 0xffffffff  # Necessary?
@@ -128,7 +127,7 @@ try:
     elif protocol == "ICMP":
         # Raw socket creation requires root privileges.
         sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-        # Optional: set DSCP on the IP layer
+        # set DSCP on the IP layer
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_TOS, DSCP_TAG_VALUE)
         
         # Create an ICMP echo request packet.
@@ -136,11 +135,10 @@ try:
         packet_sequence = 1
         icmp_packet = create_icmp_packet(packet_id, packet_sequence)
         
-        # Send the packet. Note: the second parameter's port is not used by ICMP.
+        # Send the packet
         sock.sendto(icmp_packet, (destination_ip, 0))
         print("ICMP packet sent.")
         
-        # Optionally, you might want to wait for a reply:
         sock.settimeout(2)
         try:
             reply, addr = sock.recvfrom(1024)
