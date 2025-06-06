@@ -1,0 +1,24 @@
+{
+    "switches": [
+        {"id": "s1", "dpid": "0000000000000001"},
+        {"id": "s2", "dpid": "0000000000000002"},
+        {"id": "s3", "dpid": "0000000000000003"},
+        {"id": "s4", "dpid": "0000000000000004"}
+    ],
+    "hosts": [
+        {"id": "h1", "connected_to": "s1"},
+        {"id": "h2", "connected_to": "s1"},
+        {"id": "h3", "connected_to": "s4"},
+        {"id": "h4", "connected_to": "s4"}
+    ],
+    "links": [
+        {"node1": "s1", "node2": "s2", "bandwidth": 10},
+        {"node1": "s2", "node2": "s4", "bandwidth": 10},
+        {"node1": "s1", "node2": "s3", "bandwidth": 1},
+        {"node1": "s3", "node2": "s4", "bandwidth": 1},
+        {"node1": "h1", "node2": "s1"},
+        {"node1": "h2", "node2": "s1"},
+        {"node1": "h3", "node2": "s4"},
+        {"node1": "h4", "node2": "s4"}
+    ]
+}

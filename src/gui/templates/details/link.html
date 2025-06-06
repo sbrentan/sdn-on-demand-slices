@@ -1,0 +1,42 @@
+<div class="container my-4" id="host-details">
+    <h3>Link Details</h3>
+    <hr>
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="form-group mb-3 details-form">
+                <label for="node_one" class="form-label">Node 1</label>
+                <input type="text" class="form-control" id="node_one" value="{{ link.source }}" readonly>
+                <label for="host_mac" class="form-label">Node 2</label>
+                <input type="text" class="form-control" id="node_two" value="{{ link.target }}" readonly>
+
+                <label class="form-label">Slices</label>
+                <div>
+                    <ul class="list-group list-group-flush slice-list">
+                        {% for slice in link.slices %}
+                        <li class="list-group-item d-flex align-items-center justify-content-between unselectable">
+                            <div>
+                                {% if slice.active %}
+                                <span class="mr-2 slice-color" style="background-color: rgb(40, 167, 69);"></span>
+                                {% else %}
+                                <span class="mr-2 slice-color" style="background-color: rgb(220, 53, 69);"></span>
+                                {% endif %}
+                                <span class="slice-text"  style="margin-left: 0">{{ slice.name }}</span>
+                            </div>
+                            <div class="d-flex justify-content-end align-items-right" style="flex-direction: column;">
+                                <span class="badge bg-info mb-1 d-flex justify-content-between">
+                                    <span style="margin-right: 5px">MIN:</span>
+                                    <span>{{ slice.min_rate }}</span>
+                                </span>
+                                <span class="badge bg-info mb-1 d-flex justify-content-between">
+                                    <span style="margin-right: 5px">MAX:</span>
+                                    <span>{{ slice.max_rate }}</span>
+                                </span>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

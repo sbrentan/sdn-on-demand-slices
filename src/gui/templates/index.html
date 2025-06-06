@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>SDN On-Demand Slices</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script src="https://unpkg.com/htmx.org@1.7.0"></script>
+
+        <link rel="stylesheet" type="text/css" href="{{ Paths.STATIC('css/style.css') }}">
+
+        <script>
+            {% for var in JS_VARS %}
+                var {{ var }} = {{ JS_VARS[var] }};
+            {% endfor %}
+        </script>
+        <script src="{{ Paths.STATIC('scripts/script.js') }}"></script>
+        <script src="{{ Paths.STATIC('scripts/add_service_modal.js') }}"></script>
+        <script src="{{ Paths.STATIC('scripts/add_protocol_modal.js') }}"></script>
+        <script src="{{ Paths.STATIC('scripts/add_port_modal.js') }}"></script>
+        <script src="{{ Paths.STATIC('scripts/monitoring.js') }}"></script>
+    </head>
+    <body>
+
+        {{ include('modals/add_service') }}
+        {{ include('modals/add_protocol') }}
+        {{ include('modals/add_port') }}
+        {{ include('modals/send_packet') }}
+
+        <div id="request-indicator" class="spinner-overlay">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        </div>
+        <h1 id="title" class="display-5 text-center my-4">SDN On-Demand Slices</h1>
+        <div class="d-flex justify-content-center actions-buttons">
+            <button type="button" id="send-packet-btn" class="btn mx-2">Send Packet</button>
+        </div>
+        <div id="app">
+            <!-- <h1>Network Topology</h1> -->
+            <div id="sidebar" class="card mb-3">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Slices</h2>
+                </div>
+                <ul class="list-group list-group-flush slice-list" id="slice-list"></ul>
+                <br>
+                <button type="button" id="new-slice-btn" class="btn btn-primary mx-2" onclick="startNewSlice()">New Slice <i class="bi bi-plus-lg"></i></button>
+                <button type="button" id="cancel-new-slice-btn" class="btn btn-secondary mx-2" style="margin-top: 5px; display: none;" onclick="canceleNewSlice()">Cancel <i class="bi bi-x-lg"></i></button>
+                <br>
+                <span id="slice-status"></span>
+            </div>
+            <div id="graph-container">
+                <div class="graph-info"></div>
+                <div class="graph-controls">
+                    <button id="zoom-plus" title="Zoom In" onclick="increaseZoom()"><i class="bi bi-zoom-in"></i></button>
+                    <button id="zoom-minus" title="Zoom Out" onclick="decreaseZoom()"><i class="bi bi-zoom-out"></i></button>
+                    <button id="reset-zoom" title="Reset Zoom" onclick="resetZoom()"><i class="bi bi-bootstrap-reboot"></i></button>
+                    <button id="reset-zoom" title="Save Layout" onclick="saveLayout()"><i class="bi bi-floppy"></i></button>
+                </div>
+                <svg id="network-graph"></svg>
+            </div>
+            <div id="details-menu" class="closed mb-3">
+                <div id='details-container' class="details-container"></div>
+                <div class="close-menu-btn"></div>
+            </div>
+        </div>
+    </body>
+</html>
+
+<script>
+    close_button = document.querySelector('.close-menu-btn');
+    close_button.addEventListener('click', function(event) {
+        deselectAll();
+        closeDetailsMenu();
+        if (isCreatingNewSlice)
+            cancelNewSlice();
+    });
+
+    document.addEventListener('htmx:configRequest', function(event) {
+        document.getElementById('request-indicator').classList.add('show');
+    });
+
+    document.addEventListener('htmx:afterRequest', function(event) {
+        document.getElementById('request-indicator').classList.remove('show');
+    });
+</script>

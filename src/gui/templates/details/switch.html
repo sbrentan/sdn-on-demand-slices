@@ -1,0 +1,36 @@
+<div class="container my-4" id="switch-details">
+    <h3>Switch Details</h3>
+    <hr>
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="form-group details-form">
+                <label for="switch_name" class="form-label">Name</label>
+                <input type="text" class="form-control editable" id="switch_name" name="name" value="{{ switch.name }}" readonly>
+                <label for="switch_dpid" class="form-label">Datapath ID</label>
+                <input type="text" class="form-control" id="switch_dpid" value="{{ switch.dpid }}" readonly>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <h5>Actions</h5>
+            <div class="row" style="padding: 0 10px;">
+                <div class="col-md-4" style="padding: 0 3px;">
+                    <button type="button" style="width: 100%" class="btn btn-primary confirm-btn" title="Edit">Edit</i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    makeEditable("#switch-details", onconfirm = async function(data) {
+        try {
+            await fetchData("", "PUT", JSON.stringify(data), "{{ Paths.SWITCH(switch.id) }}");
+            return true;
+        } catch (error) {
+            console.error("Failed to update switch details", error);
+        }
+        return false;
+    });
+</script>

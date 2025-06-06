@@ -1,0 +1,259 @@
+<div class="container my-4" id="slice-details">
+    <h3>
+        {% if new_slice %}
+        New Slice
+        {% else %}
+        Slice Details
+        {% endif %}
+    </h3>
+    {% if not new_slice %}
+    <h6 style="padding: 0 10px;">
+        {% if slice.active %}
+        <span class="mr-2 slice-color" style="background-color: rgb(40, 167, 69); "></span><span style="color: rgb(40, 167, 69);">Enabled</span>
+        {% else %}
+        <span class="mr-2 slice-color" style="background-color: rgb(220, 53, 69);"></span><span style="color: rgb(220, 53, 69);">Disabled</span>
+        {% endif %}
+    </h6>
+    {% endif %}
+    <hr>
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="form-group details-form">
+                {% if not new_slice %}
+                <label for="slice_id" class="form-label">Id</label>
+                <input type="text" class="form-control" id="slice_id" value="{{ slice.id }}" readonly>
+                {% endif %}
+                <label for="slice_name" class="form-label">Name</label>
+                <input type="text" class="form-control editable" id="slice_name" name="name" value="{{ slice.name }}" readonly>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="min_rate" class="form-label">Min Rate</label>
+                            <input type="number" step="1" class="form-control editable" id="min_rate" name="min_rate" value="{{ '' if new_slice else slice.min_rate }}" readonly>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="max_rate" class="form-label">Max Rate</label>
+                            <input type="number" step="1" class="form-control editable" id="max_rate" name="max_rate" value="{{ '' if new_slice else slice.max_rate }}" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="justify-content-between d-flex align-items-center mb-2">
+                    <label class="form-label">Allowed Protocols</label>
+                    <button id="add-protocol-btn" title="Add protocol" class="btn btn-success" style="padding:0 5px"><i class="bi bi-plus-lg"></i></button>
+                </div>
+                <ul class="protocols-list" initial-values='{{ slice.rules.allowed_protocols | tojson }}'>
+                    {% if slice.rules.allowed_protocols %}
+                        {% for protocol in slice.rules.allowed_protocols %}
+                            <li class="deletable">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-info" style="font-size: 1em;">{{ protocol }}</span>
+                                    <span class="delete-list-item" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    {% endif %}
+                </ul>
+                <div class="justify-content-between d-flex align-items-center mb-2">
+                    <label class="form-label">Allowed Ports</label>
+                    <button id="add-port-btn" title="Add port" class="btn btn-success" style="padding:0 5px"><i class="bi bi-plus-lg"></i></button>
+                </div>
+                <ul class="ports-list" initial-values='{{ slice.rules.allowed_ports | tojson }}'>
+                    {% if slice.rules.allowed_ports %}
+                        {% for port in slice.rules.allowed_ports %}
+                            <li class="deletable">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-info" style="font-size: 1em;">{{ port }}</span>
+                                    <span class="delete-list-item" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    {% endif %}
+                </ul>
+                <div class="justify-content-between d-flex align-items-center mb-2">
+                    <label class="form-label">Allowed Services</label>
+                    <button id="add-service-btn" title="Add service" class="btn btn-success" style="padding:0 5px"><i class="bi bi-plus-lg"></i></button>
+                </div>
+                <ul class="list-group services-list" initial-values='{{ slice.rules.allowed_services | tojson }}'>
+                    {% if slice.rules.allowed_services %}
+                        {% for ip, ports in slice.rules.allowed_services.items() %}
+                            <li class="list-group-item deletable p-1">
+                                <div class="d-flex justify-content-between align-items-center ">
+                                    <mark>{{ ip }}</mark>
+                                    <div>
+                                        {% for port in ports %}
+                                            <span class="badge bg-info">{{ port }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="delete-list-item" onclick="deleteRule(this.parentNode)"><i class="bi bi-x"></i></div>
+                            </li>
+                        {% endfor %}
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    {% if not new_slice %}
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <h5>Actions</h5>
+            <div class="row slice-actions" style="padding: 0 10px;">
+                <div class="col-md-4" style="padding: 0 3px;">
+                    <button type="button" class="btn btn-primary w-100 confirm-btn" title="Edit">Edit</i></button>
+                </div>
+                <div class="col-md-4" style="padding: 0 3px;">
+                    {% if slice.active %}
+                    <button type="button" class="btn btn-warning w-100" title="Disable"
+                            hx-post="{{ ApiPaths.DEACTIVATE_SLICE(slice.id) }}"
+                            hx-indicator="#request-indicator" hx-trigger="click"
+                    >
+                        Disable <i class="bi bi-lock-fill"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-success w-100" title="Enable"
+                            hx-post="{{ ApiPaths.ACTIVATE_SLICE(slice.id) }}"
+                            hx-indicator="#request-indicator" hx-trigger="click"
+                    >
+                        Enable <i class="bi bi-unlock-fill"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="col-md-4" style="padding: 0 3px;">
+                    <button type="button" class="btn btn-danger w-100" title="Delete"
+                            hx-delete="{{ ApiPaths.SLICE(slice.id) }}"
+                            hx-indicator="#request-indicator" hx-trigger="click"
+                    >
+                        Delete <i class="bi bi-trash-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+<script>
+    {% if new_slice %}
+    document.getElementById('details-container').classList.add('editing');
+    let details = document.querySelector("#slice-details");
+    let form = details.querySelector('.details-form');
+    form.querySelectorAll('input.editable').forEach(input => {
+        input.classList.add('editing')
+        input.removeAttribute('readonly');
+    });
+    {% else %}
+    makeEditable("#slice-details", onconfirm = async function(data) {
+        // This is called only when updating a slice
+        {% if not new_slice %}
+        document.getElementById('request-indicator').classList.add('show');
+        data['rules'] = getDefinedSliceRules();
+        if (!data['rules'])
+            return false;
+        try {
+            await fetchData("", "PUT", JSON.stringify(data), "{{ Paths.SLICE(slice.id) }}");
+            document.getElementById('request-indicator').classList.remove('show');
+            return true;
+        } catch (error) {
+            document.getElementById('request-indicator').classList.remove('show');
+            console.error("Failed to update slice details", error);
+        }
+        {% endif %}
+        return false;
+    }, oncancel = restoreInitialSliceRules);
+    {% endif %}
+    function deleteRule(item) {
+        details_container = document.getElementById('details-container');
+        if (!details_container.classList.contains('editing'))
+            return;
+        item.classList.add('deleted');
+        setTimeout(() => {
+            item.remove();
+        }, 600);
+    }
+    document.getElementById('add-service-btn')?.addEventListener('click', function() {
+        var service_ports = {};
+        var lis = document.querySelectorAll('.services-list li.deletable');
+        if (lis) {
+            lis.forEach(li => {
+                var ip = li.querySelector('mark').innerText;
+                var ports = [];
+                li.querySelectorAll('.badge').forEach(span => {
+                    ports.push(span.innerText);
+                });
+                service_ports[ip] = ports;
+            });
+        }
+        openServicesModal(function(ip, ports) {
+            var servicesList = document.querySelector('.services-list');
+            var newItem = document.createElement('li');
+            newItem.classList.add('list-group-item', 'deletable', 'p-1');
+            newItem.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center ">
+                    <mark>${ip}</mark>
+                    <div>
+                        ${ports.map(port => `<span class="badge bg-info">${port}</span>`).join('')}
+                    </div>
+                </div>
+                <div class="delete-list-item" onclick="deleteRule(this.parentNode)"><i class="bi bi-x"></i></div>
+            `;
+            servicesList.appendChild(newItem);
+        }, service_ports);
+    });
+    document.getElementById('add-protocol-btn')?.addEventListener('click', function() {
+        var protocols = []
+        var lis = document.querySelectorAll('.protocols-list li.deletable');
+        if (lis) {
+            lis.forEach(li => {
+                protocols.push(li.querySelector('span').innerText);
+            });
+        }
+        openProtocolsModal(function(protocol) {
+            var protocolsList = document.querySelector('.protocols-list');
+            var newItem = document.createElement('li');
+            newItem.classList.add('deletable');
+            newItem.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-info" style="font-size: 1em;">${protocol}</span>
+                    <span class="delete-list-item" onclick="deleteRule(this.parentNode.parentNode)"><i class="bi bi-x"></i></span>
+                </div>
+            `;
+            protocolsList.appendChild(newItem);
+        }, protocols);
+    });
+    document.getElementById('add-port-btn')?.addEventListener('click', function() {
+        var ports = [];
+        var lis = document.querySelectorAll('.ports-list li.deletable');
+        if (lis) {
+            lis.forEach(li => {
+                ports.push(li.querySelector('span').innerText);
+            });
+        }
+        openPortsModal(function(port) {
+            var portsList = document.querySelector('.ports-list');
+            var newItem = document.createElement('li');
+            newItem.classList.add('deletable');
+            newItem.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-info" style="font-size: 1em;">${port}</span>
+                    <span class="delete-list-item" onclick="deleteRule(parentNode.parentNode)"><i class="bi bi-x"></i></span>
+                </div>
+            `;
+            portsList.appendChild(newItem);
+        });
+    });
+
+    // add key down events on bandwidth inputs to avoid typing non-numeric characters
+    document.getElementById('min_rate').addEventListener('keydown', function(e) {
+        if (e.key && e.key.length === 1 && !/^\d$/.test(e.key)) {
+            e.preventDefault();
+        }
+    });
+    document.getElementById('max_rate').addEventListener('keydown', function(e) {
+        if (e.key && e.key.length === 1 && !/^\d$/.test(e.key)) {
+            e.preventDefault();
+        }
+    });
+    
+</script>
